@@ -21,20 +21,25 @@ import ballerina/io;
 import ballerina/observe;
 import ballerina/time;
 import ballerina/log;
+import ballerina/lang.'string as strings;
+import ballerina/url;
 
 final boolean observabilityEnabled = observe:isObservabilityEnabled();
 
-# Parses the given header value to extract its value and parameter map.
+# Parses the header value which contains multiple values or parameters.
+# ```ballerina
+#  http:HeaderValue[] values = check http:parseHeader("text/plain;level=1;q=0.6, application/xml;level=2");
+# ```
 #
 # + headerValue - The header value
-# + return - A tuple containing the value and its parameter map or else an `http:ClientError` if the header parsing fails
-//TODO: Make the error nillable
-public isolated function parseHeader(string headerValue) returns [string, map<any>]|ClientError = @java:Method {
+# + return - An array of `http:HeaderValue` typed record containing the value and its parameter map
+#            or else an `http:ClientError` if the header parsing fails
+public isolated function parseHeader(string headerValue) returns HeaderValue[]|ClientError = @java:Method {
     'class: "io.ballerina.stdlib.http.api.nativeimpl.ParseHeader",
     name: "parseHeader"
 } external;
 
-isolated function buildRequest(RequestMessage message) returns Request|ClientError {
+isolated function buildRequest(RequestMessage message, string? mediaType) returns Request|ClientError {
     Request request = new;
     if (message is ()) {
         request.noEntityBody = true;
@@ -53,14 +58,44 @@ isolated function buildRequest(RequestMessage message) returns Request|ClientErr
     } else if (message is mime:Entity[]) {
         request.setBodyParts(message);
     } else {
-        var result = trap val:toJson(message);
-        if (result is error) {
-            return error InitializingOutboundRequestError("json conversion error: " + result.message(), result);
-        } else {
-            request.setJsonPayload(result);
+        match mediaType {
+            mime:APPLICATION_FORM_URLENCODED => {
+                string payload = check processUrlEncodedContent(message);
+                request.setTextPayload(payload, mime:APPLICATION_FORM_URLENCODED);
+            }
+            _ => {
+                json payload = check processJsonContent(message);
+                request.setJsonPayload(payload);
+            }
         }
     }
     return request;
+}
+
+isolated function processUrlEncodedContent(anydata message) returns string|ClientError {
+    if message is map<string> {
+        do {
+            string[] messageParams = [];
+            foreach var ['key, value] in message.entries() {
+                string encodedValue = check url:encode(value, "UTF-8");
+                string entry = string`${'key}=${encodedValue}`;
+                messageParams.push(entry);
+            }
+            return strings:'join("&", ...messageParams);
+        } on fail var e {
+            return error InitializingOutboundRequestError("content encoding error: " + e.message(), e);
+        }
+    } else {
+        return error InitializingOutboundRequestError("unsupported content for application/x-www-form-urlencoded media type");
+    }
+}
+
+isolated function processJsonContent(anydata message) returns json|ClientError {
+    var result = trap val:toJson(message);
+    if (result is error) {
+        return error InitializingOutboundRequestError("json conversion error: " + result.message(), result);
+    }
+    return result;
 }
 
 isolated function buildResponse(ResponseMessage message) returns Response|ListenerError {

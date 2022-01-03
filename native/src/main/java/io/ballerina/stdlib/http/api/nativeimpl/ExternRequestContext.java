@@ -29,24 +29,33 @@ import io.ballerina.stdlib.http.api.HttpUtil;
 public class ExternRequestContext {
     public static Object next(BObject requestCtx) {
         BArray interceptors = getInterceptors(requestCtx);
+        Object mainService = requestCtx.getNativeData(HttpConstants.TARGET_SERVICE);
         if (interceptors != null) {
             if (!isInterceptorService(requestCtx)) {
-                return HttpUtil.createHttpError("illegal function invocation : next()",
+                // TODO : After introducing response interceptors, calling ctx.next() should return "illegal function
+                //  invocation : next()" if there is a response interceptor service in the pipeline
+                return HttpUtil.createHttpError("no next service to be returned",
                         HttpErrorType.GENERIC_LISTENER_ERROR);
             }
             int interceptorId = (int) requestCtx.getNativeData(HttpConstants.INTERCEPTOR_SERVICE_INDEX) + 1;
-            Object interceptor = null;
+            Object interceptorToReturn = mainService;
+            Object interceptor;
             requestCtx.addNativeData(HttpConstants.REQUEST_CONTEXT_NEXT, true);
             while (interceptorId < interceptors.size()) {
                 interceptor = interceptors.get(interceptorId);
                 String interceptorType = HttpUtil.getInterceptorServiceType((BObject) interceptor);
                 if (interceptorType.equals(HttpConstants.HTTP_REQUEST_INTERCEPTOR)) {
+                    interceptorToReturn = interceptor;
                     break;
                 }
                 interceptorId += 1;
             }
+            if (interceptorId > interceptors.size()) {
+                return HttpUtil.createHttpError("no next service to be returned",
+                        HttpErrorType.GENERIC_LISTENER_ERROR);
+            }
             requestCtx.addNativeData(HttpConstants.INTERCEPTOR_SERVICE_INDEX, interceptorId);
-            return interceptor;
+            return interceptorToReturn;
         } else {
             return HttpUtil.createHttpError("request context object does not contain the configured " +
                     "interceptors", HttpErrorType.GENERIC_LISTENER_ERROR);
@@ -59,7 +68,7 @@ public class ExternRequestContext {
     }
 
     private static BArray getInterceptors(BObject requestCtx) {
-        return requestCtx.getNativeData(HttpConstants.HTTP_INTERCEPTORS) == null ? null :
-                (BArray) requestCtx.getNativeData(HttpConstants.HTTP_INTERCEPTORS);
+        return requestCtx.getNativeData(HttpConstants.INTERCEPTORS) == null ? null :
+                (BArray) requestCtx.getNativeData(HttpConstants.INTERCEPTORS);
     }
 }
