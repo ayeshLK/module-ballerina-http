@@ -18,29 +18,56 @@
 package io.ballerina.stdlib.http.api.nativeimpl;
 
 import io.ballerina.runtime.api.values.BArray;
+import io.ballerina.runtime.api.values.BError;
+import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
+import io.ballerina.runtime.api.values.BString;
+import io.ballerina.runtime.api.values.BTypedesc;
 import io.ballerina.stdlib.http.api.HttpConstants;
 import io.ballerina.stdlib.http.api.HttpErrorType;
 import io.ballerina.stdlib.http.api.HttpUtil;
+import org.ballerinalang.langlib.value.EnsureType;
+
+import static io.ballerina.stdlib.http.api.HttpErrorType.INTERCEPTOR_RETURN_ERROR;
 
 /**
  * Utilities related to HTTP request context.
  */
-public class ExternRequestContext {
+public final class ExternRequestContext {
+
+    private ExternRequestContext() {}
+
+    public static Object getWithType(BObject requestCtx, BString key, BTypedesc targetType) {
+        BMap members = requestCtx.getMapValue(HttpConstants.REQUEST_CTX_MEMBERS);
+        try {
+            Object value = members.getOrThrow(key);
+            Object convertedType = EnsureType.ensureType(value, targetType);
+            if (convertedType instanceof BError) {
+                return HttpUtil.createHttpError("type conversion failed for value of key: " + key.getValue(),
+                                                HttpErrorType.GENERIC_LISTENER_ERROR,
+                                                (BError) convertedType);
+            }
+            return convertedType;
+        } catch (Exception exp) {
+            return HttpUtil.createHttpError("no member found for key: " + key.getValue(),
+                                            HttpErrorType.GENERIC_LISTENER_ERROR,
+                                            exp instanceof BError ? (BError) exp : null);
+        }
+    }
+
     public static Object next(BObject requestCtx) {
         BArray interceptors = getInterceptors(requestCtx);
         if (interceptors != null) {
             if (!isInterceptorService(requestCtx)) {
                 // TODO : After introducing response interceptors, calling ctx.next() should return "illegal function
                 //  invocation : next()" if there is a response interceptor service in the pipeline
-                return HttpUtil.createHttpError("no next service to be returned",
-                                                HttpErrorType.INTERCEPTOR_RETURN_ERROR);
+                return HttpUtil.createHttpStatusCodeError(INTERCEPTOR_RETURN_ERROR, "no next service to be returned");
             }
             requestCtx.addNativeData(HttpConstants.REQUEST_CONTEXT_NEXT, true);
             return getNextInterceptor(requestCtx, interceptors);
         } else {
-            return HttpUtil.createHttpError("request context object does not contain the configured interceptors",
-                                            HttpErrorType.INTERCEPTOR_RETURN_ERROR);
+            String message = "request context object does not contain the configured interceptors";
+            return HttpUtil.createHttpStatusCodeError(INTERCEPTOR_RETURN_ERROR, message);
         }
     }
 
@@ -63,8 +90,7 @@ public class ExternRequestContext {
             }
         }
         if (interceptorIndex > interceptors.size()) {
-            return HttpUtil.createHttpError("no next service to be returned",
-                                            HttpErrorType.INTERCEPTOR_RETURN_ERROR);
+            return HttpUtil.createHttpStatusCodeError(INTERCEPTOR_RETURN_ERROR, "no next service to be returned");
         }
         if (interceptorIndex < 0) {
             return null;

@@ -18,8 +18,11 @@
 
 package io.ballerina.stdlib.http.api;
 
+import io.ballerina.runtime.api.PredefinedTypes;
+import io.ballerina.runtime.api.Runtime;
+import io.ballerina.runtime.api.async.Callback;
 import io.ballerina.runtime.api.creators.ErrorCreator;
-import io.ballerina.runtime.api.types.ArrayType;
+import io.ballerina.runtime.api.creators.ValueCreator;
 import io.ballerina.runtime.api.types.Type;
 import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.values.BArray;
@@ -27,7 +30,9 @@ import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
+import io.ballerina.stdlib.http.api.nativeimpl.ModuleUtils;
 import io.ballerina.stdlib.http.api.service.signature.AllHeaderParams;
+import io.ballerina.stdlib.http.api.service.signature.AllPathParams;
 import io.ballerina.stdlib.http.api.service.signature.AllQueryParams;
 import io.ballerina.stdlib.http.api.service.signature.NonRecurringParam;
 import io.ballerina.stdlib.http.api.service.signature.ParamHandler;
@@ -37,26 +42,28 @@ import io.ballerina.stdlib.http.api.service.signature.RemoteMethodParamHandler;
 import io.ballerina.stdlib.http.transport.message.HttpCarbonMessage;
 import io.ballerina.stdlib.http.uri.URIUtil;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URI;
-import java.net.URLDecoder;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
 
-import static io.ballerina.runtime.api.TypeTags.ARRAY_TAG;
+import static io.ballerina.stdlib.http.api.HttpConstants.AUTHORIZATION_HEADER;
+import static io.ballerina.stdlib.http.api.HttpConstants.BEARER_AUTHORIZATION_HEADER;
 import static io.ballerina.stdlib.http.api.HttpConstants.DEFAULT_HOST;
-import static io.ballerina.stdlib.http.api.HttpConstants.EXTRA_PATH_INDEX;
-import static io.ballerina.stdlib.http.api.HttpConstants.HTTP_SCHEME;
-import static io.ballerina.stdlib.http.api.HttpConstants.SCHEME_SEPARATOR;
+import static io.ballerina.stdlib.http.api.HttpConstants.JWT_DECODER_CLASS_NAME;
+import static io.ballerina.stdlib.http.api.HttpConstants.JWT_DECODE_METHOD_NAME;
+import static io.ballerina.stdlib.http.api.HttpConstants.JWT_INFORMATION;
+import static io.ballerina.stdlib.http.api.HttpConstants.QUERY_STRING_SEPARATOR;
+import static io.ballerina.stdlib.http.api.HttpConstants.REQUEST_CTX_MEMBERS;
+import static io.ballerina.stdlib.http.api.HttpConstants.WHITESPACE;
+import static io.ballerina.stdlib.http.api.HttpErrorType.SERVICE_NOT_FOUND_ERROR;
 import static io.ballerina.stdlib.http.api.HttpUtil.getParameterTypes;
-import static io.ballerina.stdlib.http.api.service.signature.ParamUtils.castParam;
-import static io.ballerina.stdlib.http.api.service.signature.ParamUtils.castParamArray;
 
 /**
  * {@code HttpDispatcher} is responsible for dispatching incoming http requests to the correct resource.
@@ -64,6 +71,8 @@ import static io.ballerina.stdlib.http.api.service.signature.ParamUtils.castPara
  * @since 0.94
  */
 public class HttpDispatcher {
+
+    private static final Logger logger = LoggerFactory.getLogger(HttpDispatcher.class);
 
     public static HttpService findService(HTTPServicesRegistry servicesRegistry, HttpCarbonMessage inboundReqMsg,
                                           boolean forInterceptors) {
@@ -79,38 +88,52 @@ public class HttpDispatcher {
                 servicesOnInterface = servicesRegistry.getServicesByHost(DEFAULT_HOST);
                 sortedServiceURIs = servicesRegistry.getSortedServiceURIsByHost(DEFAULT_HOST);
             } else {
-                inboundReqMsg.setHttpStatusCode(404);
                 String localAddress = inboundReqMsg.getProperty(HttpConstants.LOCAL_ADDRESS).toString();
-                throw HttpUtil.createHttpError("no service has registered for listener : " + localAddress,
-                                               HttpErrorType.SERVICE_DISPATCHING_ERROR);
+                String message = "no service has registered for listener : " + localAddress;
+                throw HttpUtil.createHttpStatusCodeError(SERVICE_NOT_FOUND_ERROR, message);
             }
 
             String rawUri = (String) inboundReqMsg.getProperty(HttpConstants.TO);
             Map<String, Map<String, String>> matrixParams = new HashMap<>();
             String uriWithoutMatrixParams = URIUtil.extractMatrixParams(rawUri, matrixParams, inboundReqMsg);
 
-            URI validatedUri = getValidatedURI(HTTP_SCHEME + SCHEME_SEPARATOR + uriWithoutMatrixParams);
+            String[] rawPathAndQuery = extractRawPathAndQuery(uriWithoutMatrixParams);
 
-            String basePath = servicesRegistry.findTheMostSpecificBasePath(validatedUri.getRawPath(),
+            String basePath = servicesRegistry.findTheMostSpecificBasePath(rawPathAndQuery[0],
                                                                            servicesOnInterface, sortedServiceURIs);
 
             if (basePath == null) {
-                inboundReqMsg.setHttpStatusCode(404);
-                throw HttpUtil.createHttpError("no matching service found for path : " + validatedUri.getRawPath(),
-                                               HttpErrorType.SERVICE_DISPATCHING_ERROR);
+                String message = "no matching service found for path";
+                throw HttpUtil.createHttpStatusCodeError(SERVICE_NOT_FOUND_ERROR, message);
             }
 
             HttpService service = servicesOnInterface.get(basePath);
             if (!forInterceptors) {
-                setInboundReqProperties(inboundReqMsg, validatedUri, basePath);
+                setInboundReqProperties(inboundReqMsg, rawPathAndQuery[0], basePath, rawPathAndQuery[1]);
                 inboundReqMsg.setProperty(HttpConstants.RAW_URI, rawUri);
                 inboundReqMsg.setProperty(HttpConstants.TO, uriWithoutMatrixParams);
                 inboundReqMsg.setProperty(HttpConstants.MATRIX_PARAMS, matrixParams);
             }
             return service;
         } catch (Exception e) {
-            throw HttpUtil.createHttpError(e.getMessage(), HttpErrorType.SERVICE_DISPATCHING_ERROR);
+            if (!(e instanceof BError)) {
+                throw HttpUtil.createHttpStatusCodeError(SERVICE_NOT_FOUND_ERROR, e.getMessage());
+            }
+            throw e;
         }
+    }
+
+    public static HttpService findSingleService(HTTPServicesRegistry servicesRegistry) {
+        HttpService service = null;
+        for (Object holder: servicesRegistry.getServicesMapByHost().values().toArray()) {
+            HTTPServicesRegistry.ServicesMapHolder mapHolder = (HTTPServicesRegistry.ServicesMapHolder) holder;
+            if (mapHolder.getServicesByBasePath().values().size() == 1 && service == null) {
+                service = (HttpService) mapHolder.getServicesByBasePath().values().toArray()[0];
+            } else {
+                return null;
+            }
+        }
+        return service;
     }
 
     // TODO : Refactor finding interceptor service logic and the usage of HTTPInterceptorServicesRegistry
@@ -129,10 +152,9 @@ public class HttpDispatcher {
                 servicesOnInterface = servicesRegistry.getServicesByHost(DEFAULT_HOST);
                 sortedServiceURIs = servicesRegistry.getSortedServiceURIsByHost(DEFAULT_HOST);
             } else {
-                inboundReqMsg.setHttpStatusCode(404);
                 String localAddress = inboundReqMsg.getProperty(HttpConstants.LOCAL_ADDRESS).toString();
-                throw HttpUtil.createHttpError("no service has registered for listener : " + localAddress,
-                                               HttpErrorType.SERVICE_DISPATCHING_ERROR);
+                String message = "no service has registered for listener : " + localAddress;
+                throw HttpUtil.createHttpStatusCodeError(SERVICE_NOT_FOUND_ERROR, message);
             }
 
             if (isResponsePath) {
@@ -149,32 +171,43 @@ public class HttpDispatcher {
             inboundReqMsg.setProperty(HttpConstants.TO, uriWithoutMatrixParams);
             inboundReqMsg.setProperty(HttpConstants.MATRIX_PARAMS, matrixParams);
 
-            URI validatedUri = getValidatedURI(HTTP_SCHEME + SCHEME_SEPARATOR + uriWithoutMatrixParams);
+            String[] rawPathAndQuery = extractRawPathAndQuery(uriWithoutMatrixParams);
 
-            String basePath = servicesRegistry.findTheMostSpecificBasePath(validatedUri.getRawPath(),
+            String basePath = servicesRegistry.findTheMostSpecificBasePath(rawPathAndQuery[0],
                                                                            servicesOnInterface, sortedServiceURIs);
 
             if (basePath == null) {
-                inboundReqMsg.setHttpStatusCode(404);
-                throw HttpUtil.createHttpError("no matching service found for path : " + validatedUri.getRawPath(),
-                                               HttpErrorType.SERVICE_DISPATCHING_ERROR);
+                String message = "no matching service found for path";
+                throw HttpUtil.createHttpStatusCodeError(SERVICE_NOT_FOUND_ERROR, message);
             }
 
             InterceptorService service = servicesOnInterface.get(basePath);
-            setInboundReqProperties(inboundReqMsg, validatedUri, basePath);
+            setInboundReqProperties(inboundReqMsg, rawPathAndQuery[0], basePath, rawPathAndQuery[1]);
             return service;
         } catch (Exception e) {
-            throw HttpUtil.createHttpError(e.getMessage(), HttpErrorType.SERVICE_DISPATCHING_ERROR);
+            if (!(e instanceof BError)) {
+                throw HttpUtil.createHttpStatusCodeError(SERVICE_NOT_FOUND_ERROR, e.getMessage());
+            }
+            throw e;
         }
     }
 
-    private static void setInboundReqProperties(HttpCarbonMessage inboundReqMsg, URI requestUri, String basePath) {
-        String subPath = URIUtil.getSubPath(requestUri.getRawPath(), basePath);
+    private static String[] extractRawPathAndQuery(String uriWithoutMatrixParams) {
+        String[] rawPathAndQuery = new String[2];
+        String[] splittedUri = uriWithoutMatrixParams.split(QUERY_STRING_SEPARATOR);
+        rawPathAndQuery[0] = splittedUri[0];
+        rawPathAndQuery[1] = splittedUri.length > 1 ? splittedUri[1] : null;
+        return rawPathAndQuery;
+    }
+
+    private static void setInboundReqProperties(HttpCarbonMessage inboundReqMsg, String rawPath,
+                                                String basePath, String rawQuery) {
+        String subPath = URIUtil.getSubPath(rawPath, basePath);
         inboundReqMsg.setProperty(HttpConstants.BASE_PATH, basePath);
         inboundReqMsg.setProperty(HttpConstants.SUB_PATH, subPath);
-        inboundReqMsg.setProperty(HttpConstants.QUERY_STR, requestUri.getQuery());
+        inboundReqMsg.setProperty(HttpConstants.QUERY_STR, rawQuery);
         //store query params comes with request as it is
-        inboundReqMsg.setProperty(HttpConstants.RAW_QUERY_STR, requestUri.getRawQuery());
+        inboundReqMsg.setProperty(HttpConstants.RAW_QUERY_STR, rawQuery);
     }
 
     public static URI getValidatedURI(String uriStr) {
@@ -234,8 +267,10 @@ public class HttpDispatcher {
     }
 
     public static Object[] getRemoteSignatureParameters(InterceptorService service, BObject response, BObject caller,
-                                                        HttpCarbonMessage httpCarbonMessage) {
-        BObject requestCtx = getRequestCtx(httpCarbonMessage);
+                                                        HttpCarbonMessage httpCarbonMessage, Runtime runtime) {
+        BObject inRequest = null;
+        BObject requestCtx = getRequestCtx(httpCarbonMessage, runtime);
+        BObject entityObj = (BObject) httpCarbonMessage.getProperty(HttpConstants.ENTITY_OBJ);
         populatePropertiesForResponsePath(httpCarbonMessage, requestCtx);
         BError error = (BError) httpCarbonMessage.getProperty(HttpConstants.INTERCEPTOR_SERVICE_ERROR);
         RemoteMethodParamHandler paramHandler = service.getRemoteMethodParamHandler();
@@ -247,6 +282,14 @@ public class HttpDispatcher {
                 case HttpConstants.REQUEST_CONTEXT:
                     int index = ((NonRecurringParam) param).getIndex();
                     paramFeed[index++] = requestCtx;
+                    paramFeed[index] = true;
+                    break;
+                case HttpConstants.REQUEST:
+                    if (inRequest == null) {
+                        inRequest = createRequest(httpCarbonMessage, entityObj);
+                    }
+                    index = ((NonRecurringParam) param).getIndex();
+                    paramFeed[index++] = inRequest;
                     paramFeed[index] = true;
                     break;
                 case HttpConstants.STRUCT_GENERIC_ERROR:
@@ -285,10 +328,10 @@ public class HttpDispatcher {
     }
 
     public static Object[] getSignatureParameters(Resource resource, HttpCarbonMessage httpCarbonMessage,
-                                                  BMap<BString, Object> endpointConfig) {
+                                                  BMap<BString, Object> endpointConfig, Runtime runtime) {
         BObject inRequest = null;
         // Getting the same caller, request context and entity object to pass through interceptor services
-        BObject requestCtx = getRequestCtx(httpCarbonMessage);
+        BObject requestCtx = getRequestCtx(httpCarbonMessage, runtime);
         populatePropertiesForRequestPath(resource, httpCarbonMessage, requestCtx);
         BObject entityObj = (BObject) httpCarbonMessage.getProperty(HttpConstants.ENTITY_OBJ);
         BError error = (BError) httpCarbonMessage.getProperty(HttpConstants.INTERCEPTOR_SERVICE_ERROR);
@@ -297,21 +340,14 @@ public class HttpDispatcher {
         Type[] parameterTypes = getParameterTypes(resource.getBalResource());
         int sigParamCount = parameterTypes.length;
         Object[] paramFeed = new Object[sigParamCount * 2];
-        int pathParamCount = paramHandler.getPathParamTokenLength();
         boolean treatNilableAsOptional = resource.isTreatNilableAsOptional();
-        // Path params are located initially in the signature before the other user provided signature params
-        if (pathParamCount != 0) {
-            // populate path params
-            HttpResourceArguments resourceArgumentValues =
-                    (HttpResourceArguments) httpCarbonMessage.getProperty(HttpConstants.RESOURCE_ARGS);
-            updateWildcardToken(resource.getWildcardToken(), pathParamCount - 1, resourceArgumentValues.getMap());
-            populatePathParams(resource, paramFeed, resourceArgumentValues, pathParamCount, httpCarbonMessage,
-                               parameterTypes);
-        }
         // Following was written assuming that they are validated
-        for (Parameter param : paramHandler.getOtherParamList()) {
+        for (Parameter param : paramHandler.getParamList()) {
             String typeName = param.getTypeName();
             switch (typeName) {
+                case HttpConstants.PATH_PARAM:
+                    ((AllPathParams) param).populateFeed(paramFeed, httpCarbonMessage, resource);
+                    break;
                 case HttpConstants.CALLER:
                     int index = ((NonRecurringParam) param).getIndex();
                     httpCaller.set(HttpConstants.CALLER_PRESENT_FIELD, true);
@@ -367,9 +403,9 @@ public class HttpDispatcher {
         return paramFeed;
     }
 
-    private static BObject getRequestCtx(HttpCarbonMessage httpCarbonMessage) {
+    private static BObject getRequestCtx(HttpCarbonMessage httpCarbonMessage, Runtime runtime) {
         BObject requestCtx = (BObject) httpCarbonMessage.getProperty(HttpConstants.REQUEST_CONTEXT);
-        return requestCtx != null ? requestCtx : createRequestContext(httpCarbonMessage);
+        return requestCtx != null ? requestCtx : createRequestContext(httpCarbonMessage, runtime);
     }
 
     private static void populatePropertiesForRequestPath(Resource resource, HttpCarbonMessage httpCarbonMessage,
@@ -412,8 +448,12 @@ public class HttpDispatcher {
         return httpCaller;
     }
 
-    static BObject createRequestContext(HttpCarbonMessage httpCarbonMessage) {
+    static BObject createRequestContext(HttpCarbonMessage httpCarbonMessage, Runtime runtime) {
         BObject requestContext = ValueCreatorUtils.createRequestContextObject();
+        String authHeader = httpCarbonMessage.getHeader(AUTHORIZATION_HEADER);
+        if (Objects.nonNull(authHeader) && authHeader.startsWith(BEARER_AUTHORIZATION_HEADER)) {
+            addJwtValuesToRequestContext(runtime, requestContext, authHeader);
+        }
         BArray interceptors = httpCarbonMessage.getProperty(HttpConstants.INTERCEPTORS) instanceof BArray ?
                               (BArray) httpCarbonMessage.getProperty(HttpConstants.INTERCEPTORS) : null;
         requestContext.addNativeData(HttpConstants.INTERCEPTORS, interceptors);
@@ -422,6 +462,54 @@ public class HttpDispatcher {
         requestContext.addNativeData(HttpConstants.REQUEST_CONTEXT_NEXT, false);
         httpCarbonMessage.setProperty(HttpConstants.REQUEST_CONTEXT, requestContext);
         return requestContext;
+    }
+
+    private static void addJwtValuesToRequestContext(Runtime runtime, BObject requestContext, String authHeader) {
+        Object decodedJwt = invokeJwtDecode(runtime, authHeader);
+        if (Objects.nonNull(decodedJwt)) {
+            BMap requestCtxMembers = requestContext.getMapValue(REQUEST_CTX_MEMBERS);
+            requestCtxMembers.put(JWT_INFORMATION, decodedJwt);
+        }
+    }
+
+    private static Object invokeJwtDecode(Runtime runtime, String authHeader) {
+        final Object[] jwtInformation = new Object[1];
+        CountDownLatch countDownLatch = new CountDownLatch(1);
+        Callback decodeCallback = new Callback() {
+            @Override
+            public void notifySuccess(Object result) {
+                if (!(result instanceof Exception)) {
+                    jwtInformation[0] = result;
+                }
+                countDownLatch.countDown();
+            }
+
+            @Override
+            public void notifyFailure(BError bError) {
+                countDownLatch.countDown();
+            }
+        };
+
+        String[] splitValues = authHeader.split(WHITESPACE);
+        if (splitValues.length != 2) {
+            return null;
+        }
+        runtime.invokeMethodAsyncSequentially(
+                ValueCreator.createObjectValue(ModuleUtils.getHttpPackage(), JWT_DECODER_CLASS_NAME),
+                JWT_DECODE_METHOD_NAME,
+                null,
+                ModuleUtils.getNotifySuccessMetaData(),
+                decodeCallback,
+                null,
+                PredefinedTypes.TYPE_ANY,
+                StringUtils.fromString(splitValues[1]),
+                true);
+        try {
+            countDownLatch.await();
+        } catch (InterruptedException exception) {
+            logger.warn("Interrupted before receiving the response");
+        }
+        return jwtInformation[0];
     }
 
     static BError createError() {
@@ -433,56 +521,6 @@ public class HttpDispatcher {
         headers.set(HttpConstants.HEADER_REQUEST_FIELD, inRequest);
         return headers;
     }
-
-    private static void populatePathParams(Resource resource, Object[] paramFeed,
-                                           HttpResourceArguments resourceArgumentValues, int pathParamCount,
-                                           HttpCarbonMessage inboundRequest,
-                                           Type[] parameterTypes) {
-
-        String[] pathParamTokens = Arrays.copyOfRange(resource.getBalResource().getParamNames(), 0, pathParamCount);
-        int actualSignatureParamIndex = 0;
-        for (String paramName : pathParamTokens) {
-            String argumentValue = resourceArgumentValues.getMap().get(paramName).get(actualSignatureParamIndex);
-            try {
-                argumentValue = URLDecoder.decode(argumentValue, "UTF-8");
-            } catch (UnsupportedEncodingException e) {
-                // we can simply ignore and send the value to application and let the
-                // application deal with the value.
-            }
-            int paramIndex = actualSignatureParamIndex * 2;
-            Type pathParamType = parameterTypes[actualSignatureParamIndex++];
-
-            try {
-                if (pathParamType.getTag() == ARRAY_TAG) {
-                    int elementTypeTag = ((ArrayType) pathParamType).getElementType().getTag();
-                    String[] segments = argumentValue.substring(1).split(HttpConstants.SINGLE_SLASH);
-                    paramFeed[paramIndex++] = castParamArray(elementTypeTag, segments);
-                } else {
-                    paramFeed[paramIndex++] = castParam(pathParamType.getTag(), argumentValue);
-                }
-                paramFeed[paramIndex] = true;
-            } catch (Exception ex) {
-                inboundRequest.setHttpStatusCode(Integer.parseInt(HttpConstants.HTTP_BAD_REQUEST));
-                throw HttpUtil.createHttpError("error in casting path parameter : '" + paramName + "'",
-                                               HttpErrorType.PATH_PARAM_BINDING_ERROR, HttpUtil.createError(ex));
-            }
-        }
-    }
-
-    private static void updateWildcardToken(String wildcardToken, int wildCardIndex,
-                                            Map<String, Map<Integer, String>> arguments) {
-        if (wildcardToken == null) {
-            return;
-        }
-        String wildcardPathSegment = arguments.get(HttpConstants.EXTRA_PATH_INFO).get(EXTRA_PATH_INDEX);
-        if (arguments.containsKey(wildcardToken)) {
-            Map<Integer, String> indexValueMap = arguments.get(wildcardToken);
-            indexValueMap.put(wildCardIndex, wildcardPathSegment);
-        } else {
-            arguments.put(wildcardToken, Collections.singletonMap(wildCardIndex, wildcardPathSegment));
-        }
-    }
-
 
     public static boolean shouldDiffer(Resource resource) {
         return (resource != null && resource.getParamHandler().isPayloadBindingRequired());

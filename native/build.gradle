@@ -23,7 +23,7 @@ plugins {
 }
 
 jacoco {
-    toolVersion = "0.8.6"
+    toolVersion = "${jacocoVersion}"
 }
 
 description = 'Ballerina - HTTP/WS Java Utils'
@@ -61,14 +61,14 @@ dependencies {
 
     implementation group: 'org.wso2.eclipse.osgi', name: 'org.eclipse.osgi', version:"${wso2EclipseOsgiVersion}"
     implementation group: 'commons-pool.wso2', name: 'commons-pool', version:"${wso2CommonsPoolVersion}"
-    implementation group: 'org.bouncycastle', name: 'bcprov-jdk15on', version: "${bouncycastleVersion}"
-    implementation group: 'org.bouncycastle', name: 'bcpkix-jdk15on', version: "${bouncycastleVersion}"
+    implementation group: 'org.bouncycastle', name: 'bcprov-jdk18on', version: "${bouncycastleVersion}"
+    implementation group: 'org.bouncycastle', name: 'bcpkix-jdk18on', version: "${bouncycastleVersion}"
     implementation group: 'jakarta.xml.bind', name: 'jakarta.xml.bind-api', version: "${jakartaXmlBindVersion}"
 
     testImplementation group: 'org.mock-server', name: 'mockserver-netty', version:"${mockserverNettyVersion}"
     testImplementation group: 'com.mashape.unirest', name: 'unirest-java', version:"${unirestVersion}"
 
-    testImplementation group: 'org.mockito', name:'mockito-inline', version: "${mockitoVersion}"
+    testImplementation group: 'org.mockito', name:'mockito-core', version: "${mockitoVersion}"
     testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: "${mockitoVersion}"
     testImplementation group: 'org.testng', name: 'testng', version: "${testngVersion}"
 }
@@ -95,12 +95,12 @@ test {
 jacocoTestReport {
     dependsOn test
     reports {
-        xml.enabled true
+        xml.required = true
     }
 }
 
 checkstyle {
-    toolVersion '7.8.2'
+    toolVersion '10.12.0'
     configFile rootProject.file("build-config/checkstyle/build/checkstyle.xml")
     configProperties = ["suppressionFile" : file("${rootDir}/build-config/checkstyle/build/suppressions.xml")]
 }

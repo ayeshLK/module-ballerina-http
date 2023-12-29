@@ -208,25 +208,16 @@ public class DefaultHttpClientConnector implements HttpClientConnector {
                 public void onSuccess(String protocol, ChannelFuture channelFuture) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Created the connection to address: {}",
-                                  route.toString() + " " + "Original Channel ID is : " + channelFuture.channel().id());
+                                  route + " Original Channel ID is : " + channelFuture.channel().id());
                     }
 
-                    if (Constants.HTTP_SCHEME.equalsIgnoreCase(protocol) && http1xSrcHandler != null) {
-                        channelFuture.channel().deregister().addListener(future ->
-                                                                             http1xSrcHandler.getEventLoop()
-                                                                                 .register(channelFuture.channel())
-                                                                                 .addListener(
-                                                                                     future1 ->
-                                                                                         startExecutingOutboundRequest(
-                                                                                         protocol, channelFuture)));
-                    } else if (Constants.HTTP_SCHEME.equalsIgnoreCase(protocol) && http2SrcHandler != null) {
-                        channelFuture.channel().deregister().addListener(future ->
-                                                                             http2SrcHandler.getChannelHandlerContext()
-                                                                                 .channel().eventLoop()
-                                                                                 .register(channelFuture.channel())
-                                                                                 .addListener(future1 ->
-                                                                                         startExecutingOutboundRequest(
-                                                                                         protocol, channelFuture)));
+                    if (isH1c(protocol)) {
+                        switchEventLoopForH1c(channelFuture).addListener(future ->
+                                        startExecutingOutboundRequest(protocol, channelFuture));
+
+                    } else if (isH2c(protocol)) {
+                        switchEventLoopForH2c(channelFuture).addListener(future ->
+                                        startExecutingOutboundRequest(protocol, channelFuture));
                     } else {
                         startExecutingOutboundRequest(protocol, channelFuture);
                     }
@@ -297,6 +288,27 @@ public class DefaultHttpClientConnector implements HttpClientConnector {
                             new SendingHeaders(senderReqRespStateManager, targetChannel, httpVersion,
                                                chunkConfig, httpResponseFuture);
                     targetChannel.senderReqRespStateManager = senderReqRespStateManager;
+                }
+
+                // Switching is done to make sure, inbound request/response and the outbound request/response
+                // are handle on the same thread and thereby avoid the need for locks
+                private ChannelFuture switchEventLoopForH1c(ChannelFuture channelFuture) {
+                    return channelFuture.channel().deregister()
+                            .addListener(future -> http1xSrcHandler.getEventLoop().register(channelFuture.channel()));
+                }
+
+                private ChannelFuture switchEventLoopForH2c(ChannelFuture channelFuture) {
+                    return channelFuture.channel().deregister().addListener(future ->
+                            http2SrcHandler.getChannelHandlerContext().channel().eventLoop()
+                                    .register(channelFuture.channel()));
+                }
+
+                private boolean isH1c(String protocol) {
+                    return Constants.HTTP_SCHEME.equalsIgnoreCase(protocol) && http1xSrcHandler != null;
+                }
+
+                private boolean isH2c(String protocol) {
+                    return Constants.HTTP_SCHEME.equalsIgnoreCase(protocol) && http2SrcHandler != null;
                 }
 
                 @Override

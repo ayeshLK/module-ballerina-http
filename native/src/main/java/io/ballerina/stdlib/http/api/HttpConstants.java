@@ -30,7 +30,7 @@ import static io.ballerina.runtime.api.constants.RuntimeConstants.ORG_NAME_SEPAR
  *
  * @since 0.8.0
  */
-public class HttpConstants {
+public final class HttpConstants {
 
     public static final String HTTPS_ENDPOINT_STARTED = "[ballerina/http] started HTTPS/WSS listener ";
     public static final String HTTP_ENDPOINT_STARTED = "[ballerina/http] started HTTP/WS listener ";
@@ -54,6 +54,7 @@ public class HttpConstants {
     public static final String DEFAULT_INTERFACE = "0.0.0.0:8080";
     public static final String DEFAULT_BASE_PATH = "/";
     public static final String DEFAULT_SUB_PATH = "/*";
+    public static final String QUERY_STRING_SEPARATOR = "\\?";
 
     public static final String PROTOCOL_HTTP = "http";
     public static final String HTTP_MOCK_SERVER_ENDPOINT_NAME = "Tballerina/http:MockListener;";
@@ -202,6 +203,7 @@ public class HttpConstants {
     public static final String QUERY_PARAM = "query";
     public static final String PAYLOAD_PARAM = "payload";
     public static final String HEADER_PARAM = "header";
+    public static final String PATH_PARAM = "path";
 
     /* Annotations */
     public static final String ANNOTATION_NAME_SOURCE = "Source";
@@ -222,6 +224,8 @@ public class HttpConstants {
     public static final String RESPONSE_CACHE_CONTROL = "ResponseCacheControl";
     public static final String REQUEST_CACHE_CONTROL = "RequestCacheControl";
     public static final String STRUCT_GENERIC_ERROR = "error";
+    public static final String ERROR_DETAIL_RECORD = "ErrorDetail";
+    public static final BString ERROR_DETAIL_BODY = StringUtils.fromString("body");
     public static final String TYPE_STRING = "string";
     public static final String TRANSPORT_MESSAGE = "transport_message";
     public static final String QUERY_PARAM_MAP = "queryParamMap";
@@ -378,7 +382,6 @@ public class HttpConstants {
     public static final String REQUEST_INTERCEPTOR_INDEX = "REQUEST_INTERCEPTOR_INDEX";
     public static final String RESPONSE_INTERCEPTOR_INDEX = "RESPONSE_INTERCEPTOR_INDEX";
     public static final String INTERCEPTOR_SERVICE_ERROR = "INTERCEPTOR_SERVICE_ERROR";
-    public static final String INTERCEPTOR_SERVICE_PANIC_ERROR = "INTERCEPTOR_SERVICE_PANIC_ERROR";
     public static final String WAIT_FOR_FULL_REQUEST = "WAIT_FOR_FULL_REQUEST";
     public static final String HTTP_NORMAL = "Normal";
     public static final String REQUEST_INTERCEPTOR = "RequestInterceptor";
@@ -388,6 +391,14 @@ public class HttpConstants {
     public static final String TARGET_SERVICE = "TARGET_SERVICE";
     public static final String INTERCEPT_RESPONSE = "interceptResponse";
     public static final String INTERCEPT_RESPONSE_ERROR = "interceptResponseError";
+    public static final String AUTHORIZATION_HEADER = "authorization";
+    public static final String BEARER_AUTHORIZATION_HEADER = "Bearer ";
+    public static final BString JWT_INFORMATION = StringUtils.fromString("JWT_INFORMATION");
+    public static final String JWT_DECODER_CLASS_NAME = "JwtDecoder";
+    public static final String JWT_DECODE_METHOD_NAME = "decodeJwt";
+    public static final String LAST_INTERCEPTOR_TYPE = "LAST_INTERCEPTOR_TYPE";
+    public static final String INTERCEPTABLE_SERVICE = "InterceptableService";
+    public static final String CREATE_INTERCEPTORS_FUNCTION_NAME = "createInterceptors";
 
     //Service Endpoint
     public static final int SERVICE_ENDPOINT_NAME_INDEX = 0;
@@ -405,6 +416,8 @@ public class HttpConstants {
     public static final BString ENDPOINT_CONFIG_VERSION = StringUtils.fromString("httpVersion");
     public static final String ENDPOINT_REQUEST_LIMITS = "requestLimits";
     public static final BString ENDPOINT_CONFIG_GRACEFUL_STOP_TIMEOUT = StringUtils.fromString("gracefulStopTimeout");
+    public static final BString ENDPOINT_CONFIG_HTTP2_INITIAL_WINDOW_SIZE = StringUtils
+            .fromString("http2InitialWindowSize");
 
     public static final BString MAX_URI_LENGTH = StringUtils.fromString("maxUriLength");
     public static final BString MAX_STATUS_LINE_LENGTH = StringUtils.fromString("maxStatusLineLength");
@@ -476,6 +489,8 @@ public class HttpConstants {
     public static final BString HTTP2_SETTINGS = StringUtils.fromString("http2Settings");
     public static final BString REQUEST_LIMITS = StringUtils.fromString("requestLimits");
     public static final BString RESPONSE_LIMITS = StringUtils.fromString("responseLimits");
+    public static final BString CLIENT_EP_HTTP2_INITIAL_WINDOW_SIZE = StringUtils
+            .fromString("http2InitialWindowSize");
 
     //Connection Throttling field names
     public static final String CONNECTION_THROTTLING_STRUCT_REFERENCE = "connectionThrottling";
@@ -557,11 +572,16 @@ public class HttpConstants {
     public static final String DOLLAR = "$";
     public static final String SINGLE_SLASH = "/";
     public static final String QUESTION_MARK = "?";
+    public static final String PLUS_SIGN = "\\+";
+    public static final String PLUS_SIGN_ENCODED = "%2B";
+    public static final String PERCENTAGE = "%";
+    public static final String PERCENTAGE_ENCODED = "%25";
     public static final String AND_SIGN = "&";
     public static final String EQUAL_SIGN = "=";
     public static final String EMPTY = "";
     public static final String QUOTATION_MARK = "\"";
     public static final String DOUBLE_SLASH = "//";
+    public static final String WHITESPACE = " ";
     public static final String REGEX = "(?<!(http:|https:))//";
     public static final String SCHEME_SEPARATOR = "://";
     public static final String HTTP_SCHEME = "http";
@@ -585,6 +605,8 @@ public class HttpConstants {
             new Module(BALLERINA_BUILTIN_PKG_PREFIX, PROTOCOL_HTTP, HTTP_MODULE_VERSION);
 
     public static final String OBSERVABILITY_CONTEXT_PROPERTY = "observabilityContext";
+
+    public static final BString REQUEST_CTX_MEMBERS = StringUtils.fromString("members");
 
     private HttpConstants() {
     }

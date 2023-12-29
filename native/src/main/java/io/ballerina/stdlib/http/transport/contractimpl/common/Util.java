@@ -57,6 +57,7 @@ import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
@@ -287,15 +288,13 @@ public class Util {
             throws Http2Exception {
         String method = Constants.HTTP_GET_METHOD;
         if (http2Headers.method() != null) {
-            method = http2Headers.getAndRemove(Constants.HTTP2_METHOD).toString();
+            method = http2Headers.get(Constants.HTTP2_METHOD).toString();
         }
         String path = Constants.DEFAULT_BASE_PATH;
         if (http2Headers.path() != null) {
-            path = http2Headers.getAndRemove(Constants.HTTP2_PATH).toString();
+            path = http2Headers.get(Constants.HTTP2_PATH).toString();
         }
-        // Remove PseudoHeaderNames from headers
-        http2Headers.getAndRemove(Constants.HTTP2_AUTHORITY);
-        http2Headers.getAndRemove(Constants.HTTP2_SCHEME);
+
         HttpVersion version = new HttpVersion(Constants.HTTP_VERSION_2_0, true);
 
         // Construct new HTTP Carbon Request
@@ -732,7 +731,7 @@ public class Util {
      * @param serverName server name
      */
     public static void sendAndCloseNoEntityBodyResp(ChannelHandlerContext ctx, HttpResponseStatus status,
-            HttpVersion httpVersion, String serverName) {
+                                                    HttpVersion httpVersion, String serverName) {
         HttpResponse outboundResponse = new DefaultHttpResponse(httpVersion, status);
         outboundResponse.headers().set(HttpHeaderNames.CONTENT_LENGTH, 0);
         outboundResponse.headers().set(HttpHeaderNames.CONNECTION.toString(), Constants.CONNECTION_CLOSE);
@@ -904,11 +903,18 @@ public class Util {
      * @return true if the connection should be kept alive
      * @throws ConfigurationException for invalid configurations
      */
-    public static boolean isKeepAlive(KeepAliveConfig keepAliveConfig, HttpCarbonMessage outboundRequestMsg)
-            throws ConfigurationException {
+    public static boolean isKeepAlive(KeepAliveConfig keepAliveConfig, HttpCarbonMessage outboundRequestMsg,
+                                      HttpCarbonMessage inboundRequestMsg) throws ConfigurationException {
         switch (keepAliveConfig) {
         case AUTO:
-            return Float.valueOf(outboundRequestMsg.getHttpVersion()) > Constants.HTTP_1_0;
+            if (Float.valueOf(outboundRequestMsg.getHttpVersion()) <= Constants.HTTP_1_0) {
+                return false;
+            }
+            if (inboundRequestMsg.getHeaders().contains(HttpHeaderNames.CONNECTION)) {
+                return !inboundRequestMsg.getHeaders().get(HttpHeaderNames.CONNECTION)
+                        .equalsIgnoreCase(HttpHeaderValues.CLOSE.toString());
+            }
+            return true;
         case ALWAYS:
             return true;
         case NEVER:
@@ -916,8 +922,7 @@ public class Util {
         default:
             // The execution will never reach here. In case execution reach here means it should be an invalid value
             // for keep-alive configurations.
-            throw new ConfigurationException("Invalid keep-alive configuration value : "
-                    + keepAliveConfig.toString());
+            throw new ConfigurationException("Invalid keep-alive configuration value : " + keepAliveConfig);
         }
     }
 

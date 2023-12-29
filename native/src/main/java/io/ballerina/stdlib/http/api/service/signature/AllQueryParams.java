@@ -18,33 +18,21 @@
 
 package io.ballerina.stdlib.http.api.service.signature;
 
-import io.ballerina.runtime.api.PredefinedTypes;
-import io.ballerina.runtime.api.TypeTags;
-import io.ballerina.runtime.api.creators.TypeCreator;
-import io.ballerina.runtime.api.creators.ValueCreator;
-import io.ballerina.runtime.api.types.ArrayType;
-import io.ballerina.runtime.api.types.FiniteType;
-import io.ballerina.runtime.api.types.MapType;
-import io.ballerina.runtime.api.types.Type;
-import io.ballerina.runtime.api.types.UnionType;
-import io.ballerina.runtime.api.utils.JsonUtils;
 import io.ballerina.runtime.api.utils.StringUtils;
-import io.ballerina.runtime.api.utils.TypeUtils;
+import io.ballerina.runtime.api.utils.ValueUtils;
 import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BString;
 import io.ballerina.stdlib.http.api.HttpConstants;
-import io.ballerina.stdlib.http.api.HttpErrorType;
 import io.ballerina.stdlib.http.api.HttpUtil;
 import io.ballerina.stdlib.http.transport.message.HttpCarbonMessage;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.ballerina.runtime.api.TypeTags.ARRAY_TAG;
-import static io.ballerina.runtime.api.TypeTags.MAP_TAG;
-import static io.ballerina.runtime.api.TypeTags.UNION_TAG;
+import static io.ballerina.stdlib.http.api.HttpErrorType.QUERY_PARAM_BINDING_ERROR;
 import static io.ballerina.stdlib.http.api.service.signature.ParamUtils.castParam;
+import static io.ballerina.stdlib.http.api.service.signature.ParamUtils.castParamArray;
 
 /**
  * {@code {@link AllQueryParams }} holds all the query parameters in the resource signature.
@@ -54,7 +42,6 @@ import static io.ballerina.stdlib.http.api.service.signature.ParamUtils.castPara
 public class AllQueryParams implements Parameter {
 
     private final List<QueryParam> allQueryParams = new ArrayList<>();
-    private static final MapType MAP_TYPE = TypeCreator.createMapType(PredefinedTypes.TYPE_JSON);
 
     @Override
     public String getTypeName() {
@@ -69,22 +56,18 @@ public class AllQueryParams implements Parameter {
         return !allQueryParams.isEmpty();
     }
 
-    public List<QueryParam> getAllQueryParams() {
-        return this.allQueryParams;
-    }
-
     public void populateFeed(HttpCarbonMessage httpCarbonMessage, ParamHandler paramHandler, Object[] paramFeed,
                              boolean treatNilableAsOptional) {
         BMap<BString, Object> urlQueryParams = paramHandler
                 .getQueryParams(httpCarbonMessage.getProperty(HttpConstants.RAW_QUERY_STR));
-        for (QueryParam queryParam : this.getAllQueryParams()) {
+        for (QueryParam queryParam : allQueryParams) {
             String token = queryParam.getToken();
             int index = queryParam.getIndex();
             boolean queryExist = urlQueryParams.containsKey(StringUtils.fromString(token));
             Object queryValue = urlQueryParams.get(StringUtils.fromString(token));
             if (queryValue == null) {
                 if (queryParam.isDefaultable()) {
-                    paramFeed[index++] = queryParam.getType().getZeroValue();
+                    paramFeed[index++] = queryParam.validateConstraints(queryParam.getOriginalType().getZeroValue());
                     paramFeed[index] = false;
                     continue;
                 } else if (queryParam.isNilable() && (treatNilableAsOptional || queryExist)) {
@@ -92,66 +75,30 @@ public class AllQueryParams implements Parameter {
                     paramFeed[index] = true;
                     continue;
                 } else {
-                    httpCarbonMessage.setHttpStatusCode(Integer.parseInt(HttpConstants.HTTP_BAD_REQUEST));
-                    throw HttpUtil.createHttpError("no query param value found for '" + token + "'",
-                                                   HttpErrorType.QUERY_PARAM_BINDING_ERROR);
+                    String message = "no query param value found for '" + token + "'";
+                    throw HttpUtil.createHttpStatusCodeError(QUERY_PARAM_BINDING_ERROR, message);
                 }
             }
-
+            Object castedQueryValue;
             try {
                 BArray queryValueArr = (BArray) queryValue;
-                Type paramType = queryParam.getType();
-                if (paramType.getTag() == ARRAY_TAG) {
-                    Type elementType = ((ArrayType) paramType).getElementType();
-                    int elementTypeTag = TypeUtils.getReferredType(elementType).getTag();
-                    BArray paramArray;
-                    if (isEnumQueryParamType(elementType)) {
-                        paramArray = ValueCreator.createArrayValue((ArrayType) paramType);
-                        for (int i = 0; i < queryValueArr.size(); i++) {
-                            paramArray.append(castEnumQueryParam((UnionType) elementType, queryValueArr.getBString(i),
-                                    token));
-                        }
-                    } else {
-                        paramArray = ParamUtils.castParamArray(elementTypeTag, queryValueArr.getStringArray());
-                    }
-                    if (queryParam.isReadonly()) {
-                        paramArray.freezeDirect();
-                    }
-                    paramFeed[index++] = paramArray;
-                } else if (paramType.getTag() == MAP_TAG) {
-                    Object json = JsonUtils.parse(queryValueArr.getBString(0).getValue());
-                    BMap<BString, ?> paramMap =  JsonUtils.convertJSONToMap(json, MAP_TYPE);
-                    if (queryParam.isReadonly()) {
-                        paramMap.freezeDirect();
-                    }
-                    paramFeed[index++] = paramMap;
-                } else if (isEnumQueryParamType(paramType)) {
-                    Object param = castEnumQueryParam((UnionType) paramType, queryValueArr.getBString(0), token);
-                    paramFeed[index++] = param;
+                Object parsedQueryValue;
+                if (queryParam.isArray()) {
+                    parsedQueryValue = castParamArray(queryParam.getEffectiveTypeTag(),
+                            queryValueArr.getStringArray());
                 } else {
-                    Object param = castParam(paramType.getTag(), queryValueArr.getBString(0).getValue());
-                    paramFeed[index++] = param;
+                    parsedQueryValue = castParam(queryParam.getEffectiveTypeTag(),
+                            queryValueArr.getBString(0).getValue());
                 }
-                paramFeed[index] = true;
+                castedQueryValue = ValueUtils.convert(parsedQueryValue, queryParam.getOriginalType());
             } catch (Exception ex) {
-                httpCarbonMessage.setHttpStatusCode(Integer.parseInt(HttpConstants.HTTP_BAD_REQUEST));
-                throw HttpUtil.createHttpError("error in casting query param : '" + token + "'",
-                                               HttpErrorType.QUERY_PARAM_BINDING_ERROR, HttpUtil.createError(ex));
+                String message = "error in casting query param : '" + token + "'";
+                throw HttpUtil.createHttpStatusCodeError(QUERY_PARAM_BINDING_ERROR, message, null,
+                        HttpUtil.createError(ex));
             }
-        }
-    }
 
-    private boolean isEnumQueryParamType(Type paramType) {
-        return TypeUtils.getReferredType(paramType).getTag() == UNION_TAG &&
-                ((UnionType) paramType).getMemberTypes()
-                        .stream().allMatch(type -> type.getTag() == TypeTags.FINITE_TYPE_TAG);
-    }
-
-    private Object castEnumQueryParam(UnionType paramType, BString queryValue, String token) {
-        if (paramType.getMemberTypes().stream().anyMatch(memberType ->
-                ((FiniteType) memberType).getValueSpace().contains(queryValue))) {
-            return queryValue;
+            paramFeed[index++] = queryParam.validateConstraints(castedQueryValue);
+            paramFeed[index] = true;
         }
-        throw new IllegalArgumentException("query param value '" + token + "' does not match enum type");
     }
 }

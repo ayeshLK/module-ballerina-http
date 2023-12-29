@@ -191,9 +191,9 @@ service /differentStatusCodes on httpStatusCodeListenerEP {
         return {body: "It's NotExtended"};
     }
 
-    resource function get networkAuthorizationRequired/[boolean constReq]() returns http:NetworkAuthorizationRequired {
+    resource function get NetworkAuthenticationRequired/[boolean constReq]() returns http:NetworkAuthenticationRequired {
         if constReq {
-            return http:NETWORK_AUTHORIZATION_REQUIRED;
+            return http:NETWORK_AUTHENTICATION_REQUIRED;
         }
         return {body: "Authorization Required"};
     }
@@ -764,8 +764,8 @@ function testStatusNotExtended() {
 }
 
 @test:Config {}
-function testNetworkAuthorizationRequired() {
-    http:Response|error response = httpStatusCodeClient->get("/differentStatusCodes/networkAuthorizationRequired/false");
+function testNetworkAuthenticationRequired() {
+    http:Response|error response = httpStatusCodeClient->get("/differentStatusCodes/NetworkAuthenticationRequired/false");
     if response is http:Response {
         test:assertEquals(response.statusCode, 511, msg = "Found unexpected output");
         test:assertEquals(response.reasonPhrase, "Network Authentication Required", msg = "Found unexpected output");
@@ -774,7 +774,7 @@ function testNetworkAuthorizationRequired() {
         test:assertFail(msg = "Found unexpected output type: " + response.message());
     }
 
-    response = httpStatusCodeClient->get("/differentStatusCodes/networkAuthorizationRequired/true");
+    response = httpStatusCodeClient->get("/differentStatusCodes/NetworkAuthenticationRequired/true");
     if response is http:Response {
         test:assertEquals(response.statusCode, 511, msg = "Found unexpected output");
         test:assertEquals(response.reasonPhrase, "Network Authentication Required", msg = "Found unexpected output");

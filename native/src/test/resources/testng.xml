@@ -126,6 +126,7 @@
             <class name="io.ballerina.stdlib.http.transport.http2.Http2ClientConnectorBasicTestCase"/>
             <class name="io.ballerina.stdlib.http.transport.http2.Http2ServerConnectorBasicTestCase"/>
             <class name="io.ballerina.stdlib.http.transport.http2.Http2ServerPushTestCase"/>
+            <class name="io.ballerina.stdlib.http.transport.http2.Http2PseudoHeadersTest"/>
             <class name="io.ballerina.stdlib.http.transport.http2.clienttimeout.TimeoutAfterRequestWrite"/>
             <class name="io.ballerina.stdlib.http.transport.http2.clienttimeout.TimeoutDuringRequestWrite"/>
             <class name="io.ballerina.stdlib.http.transport.http2.clienttimeout.TimeoutDuringResponseReceive"/>
@@ -173,7 +174,7 @@
             <class name="io.ballerina.stdlib.http.transport.https.CipherSuiteswithCertsTest"/>
             <class name="io.ballerina.stdlib.http.transport.https.OptionalMutualSSLTest"/>
             <class name="io.ballerina.stdlib.http.transport.https.SSLProtocolsWithCertsTest"/>
-            <class name="io.ballerina.stdlib.http.transport.http2.ssl.Http2ALPNwithCertsTest"/>
+            <class name="io.ballerina.stdlib.http.transport.http2.ssl.Http2AlpnWithCertsTest"/>
             <class name="io.ballerina.stdlib.http.transport.http2.ssl.TestHttp2WithALPN"/>
             <class name="io.ballerina.stdlib.http.transport.http2.ssl.Http2MutualSslTest"/>
             <class name="io.ballerina.stdlib.http.transport.http2.ssl.DisableSslTest"/>

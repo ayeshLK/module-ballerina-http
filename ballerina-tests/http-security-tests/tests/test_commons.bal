@@ -17,8 +17,8 @@
 // NOTE: All the tokens/credentials used in this test are dummy tokens/credentials and used only for testing purposes.
 
 import ballerina/http;
-import ballerina/regex;
 import ballerina/test;
+import ballerina/url;
 import ballerina/http_test_common as common;
 
 const string KEYSTORE_PATH = common:KEYSTORE_PATH;
@@ -195,6 +195,9 @@ const string JWT3 = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3OD
 const string ACCESS_TOKEN_1 = "2YotnFZFEjr1zCsicMWpAA";
 const string ACCESS_TOKEN_2 = "1zCsicMWpAA2YotnFZFEjr";
 const string ACCESS_TOKEN_3 = "invalid-token";
+const string ACCESS_TOKEN_4 = "NiIsInR5cCI6IkpXV";
+
+const COMPLEX_PASSWORD = "Ef2%I1^@Nd8>WTtcn+3=QL?M!{gG198h=lH4<ukg";
 
 http:ListenerConfiguration http2SslServiceConf = {
     secureSocket: {
@@ -361,7 +364,19 @@ listener http:Listener sts = new (stsPort, {
 });
 
 service /oauth2 on sts {
-    resource function post token() returns AuthResponse {
+    resource function post token(http:Request req) returns AuthResponse|error {
+        string payload = check req.getTextPayload();
+        if payload.includes("grant_type=password") && payload.includes("username=complexpassuser") && 
+                    payload.includes(check url:encode(COMPLEX_PASSWORD, "UTF-8")) {
+            return {
+                body: {
+                    "access_token": ACCESS_TOKEN_4,
+                    "token_type": "example",
+                    "expires_in": 3600,
+                    "example_parameter": "example_value"
+                }
+            };
+        }
         return {
             body: {
                 "access_token": ACCESS_TOKEN_1,
@@ -375,10 +390,10 @@ service /oauth2 on sts {
     resource function post introspect(http:Request request) returns AuthResponse {
         string|http:ClientError payload = request.getTextPayload();
         if payload is string {
-            string[] parts = regex:split(payload, "&");
+            string[] parts = re`&`.split(payload);
             foreach string part in parts {
                 if part.indexOf("token=") is int {
-                    string token = regex:split(part, "=")[1];
+                    string token = re`=`.split(part)[1];
                     if token == ACCESS_TOKEN_1 {
                         return {
                             body: {"active": true, "exp": 3600, "scp": "write update"}

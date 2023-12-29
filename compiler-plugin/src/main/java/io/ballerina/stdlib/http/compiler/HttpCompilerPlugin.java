@@ -18,9 +18,11 @@
 
 package io.ballerina.stdlib.http.compiler;
 
+import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.projects.plugins.CompilerPlugin;
 import io.ballerina.projects.plugins.CompilerPluginContext;
 import io.ballerina.projects.plugins.codeaction.CodeAction;
+import io.ballerina.projects.plugins.completion.CompletionProvider;
 import io.ballerina.stdlib.http.compiler.codeaction.AddHeaderParameterCodeAction;
 import io.ballerina.stdlib.http.compiler.codeaction.AddInterceptorRemoteMethodCodeAction;
 import io.ballerina.stdlib.http.compiler.codeaction.AddInterceptorResourceMethodCodeAction;
@@ -30,6 +32,8 @@ import io.ballerina.stdlib.http.compiler.codeaction.AddResponseContentTypeCodeAc
 import io.ballerina.stdlib.http.compiler.codeaction.ChangeHeaderParamTypeToStringArrayCodeAction;
 import io.ballerina.stdlib.http.compiler.codeaction.ChangeHeaderParamTypeToStringCodeAction;
 import io.ballerina.stdlib.http.compiler.codeaction.ChangeReturnTypeWithCallerCodeAction;
+import io.ballerina.stdlib.http.compiler.codemodifier.HttpServiceModifier;
+import io.ballerina.stdlib.http.compiler.completion.HttpServiceBodyContextProvider;
 
 import java.util.List;
 
@@ -40,8 +44,10 @@ public class HttpCompilerPlugin extends CompilerPlugin {
 
     @Override
     public void init(CompilerPluginContext context) {
+        context.addCodeModifier(new HttpServiceModifier());
         context.addCodeAnalyzer(new HttpServiceAnalyzer());
         getCodeActions().forEach(context::addCodeAction);
+        getCompletionProviders().forEach(context::addCompletionProvider);
     }
 
     private List<CodeAction> getCodeActions() {
@@ -56,5 +62,9 @@ public class HttpCompilerPlugin extends CompilerPlugin {
                 new AddInterceptorResourceMethodCodeAction(),
                 new AddInterceptorRemoteMethodCodeAction()
         );
+    }
+
+    private List<CompletionProvider<? extends Node>> getCompletionProviders() {
+        return List.of(new HttpServiceBodyContextProvider());
     }
 }

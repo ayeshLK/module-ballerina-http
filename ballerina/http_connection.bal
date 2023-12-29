@@ -19,6 +19,7 @@ import ballerina/lang.value as val;
 import ballerina/lang.'string as strings;
 import ballerina/url;
 import ballerina/mime;
+import http.httpscerr;
 
 # The caller actions for responding to client requests.
 #
@@ -191,21 +192,21 @@ public isolated client class Caller {
         return nativeRespond(self, response);
     }
 
-    private isolated function returnErrorResponse(error errorResponse, string? returnMediaType = (), int? statusCode = ()) returns ListenerError? {
-        Response response = new;
-        if errorResponse is ApplicationResponseError {
-            InternalServerError err = {
-                headers: errorResponse.detail().headers,
-                body: errorResponse.detail().body
-            };
-            response = createStatusCodeResponse(err, returnMediaType);
-            response.statusCode = errorResponse.detail().statusCode;
-        } else {
-            response.statusCode = statusCode is () ? STATUS_INTERNAL_SERVER_ERROR : statusCode;
-            response.setTextPayload(errorResponse.message());
+    private isolated function returnErrorResponse(error errorResponse, string? returnMediaType = ()) returns ListenerError? {
+        error err = errorResponse;
+        if errorResponse is ClientConnectorError {
+            err = error httpscerr:BadGatewayError(getClientConnectorErrorCause(errorResponse));
         }
-        return nativeRespondError(self, response, errorResponse);
+        return nativeRespondError(self, getErrorResponse(errorResponse, returnMediaType), err);
     }
+}
+
+isolated function getClientConnectorErrorCause(error err) returns string {
+    if err.cause() !is () {
+        error cause = <error>err.cause();
+        return string`${err.message()}: ${getClientConnectorErrorCause(cause)}`;
+    }
+    return err.message();
 }
 
 isolated function createStatusCodeResponse(StatusCodeResponse message, string? returnMediaType = (), boolean setETag = false, map<Link>? links = ())

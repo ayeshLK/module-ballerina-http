@@ -14,6 +14,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import ballerina/jwt;
+
 # The HTTP request interceptor service object type
 public type RequestInterceptor distinct service object {
 
@@ -34,6 +36,16 @@ public type ResponseErrorInterceptor distinct service object {
 
 };
 
+# The service type to be used when engaging interceptors at the service level
+public type InterceptableService distinct service object {
+    *Service;
+
+    # Function to define interceptor pipeline
+    #
+    # + return - The `http:Interceptor|http:Interceptor[]`
+    public function createInterceptors() returns Interceptor|Interceptor[];
+};
+
 # The return type of an interceptor service function
 public type NextService RequestInterceptor|ResponseInterceptor|Service;
 
@@ -44,10 +56,19 @@ public type Interceptor RequestInterceptor|ResponseInterceptor|RequestErrorInter
 service class DefaultErrorInterceptor {
     *ResponseErrorInterceptor;
 
-    remote function interceptResponseError(error err, Response alreadyBuiltErrorResponse) returns Response {
-        // Returning the already built response for simplicity. This has been built with proper 
-        // status code and headers (for `ApplicationResponseError` types)
-        // For any other custom responses the `err` object can be used with type check
-        return alreadyBuiltErrorResponse;
+    remote function interceptResponseError(error err, Request request) returns Response {
+        return getErrorResponseForInterceptor(err, request);
+    }
+}
+
+# The class used by the runtime to invoke the `decodeJwt` method to add jwt values to the request context.
+isolated class JwtDecoder {
+
+    # Decodes a jwt string to `[jwt:Header, jwt:Payload]`.
+    #
+    # + jwt - The jwt value as a string
+    # + return - `[jwt:Header, jwt:Payload]` if successful or else an `error`
+    isolated function decodeJwt(string jwt) returns [jwt:Header, jwt:Payload]|error {
+        return jwt:decode(jwt);
     }
 }

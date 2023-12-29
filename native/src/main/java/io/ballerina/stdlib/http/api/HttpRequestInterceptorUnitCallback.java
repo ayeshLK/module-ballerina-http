@@ -22,11 +22,14 @@ import io.ballerina.runtime.api.PredefinedTypes;
 import io.ballerina.runtime.api.Runtime;
 import io.ballerina.runtime.api.async.Callback;
 import io.ballerina.runtime.api.types.ServiceType;
+import io.ballerina.runtime.api.utils.TypeUtils;
 import io.ballerina.runtime.api.values.BArray;
 import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.stdlib.http.api.nativeimpl.ModuleUtils;
 import io.ballerina.stdlib.http.transport.message.HttpCarbonMessage;
+
+import static io.ballerina.stdlib.http.api.HttpErrorType.INTERCEPTOR_RETURN_ERROR;
 
 /**
  * {@code HttpRequestInterceptorUnitCallback} is the responsible for acting on notifications received from Ballerina
@@ -34,7 +37,7 @@ import io.ballerina.stdlib.http.transport.message.HttpCarbonMessage;
  *
  * @since SL Beta 4
  */
-public class HttpRequestInterceptorUnitCallback implements Callback {
+public class HttpRequestInterceptorUnitCallback extends HttpCallableUnitCallback {
     private static final String ILLEGAL_FUNCTION_INVOKED = "illegal return: response has already been sent";
     private final BObject caller;
     private final Runtime runtime;
@@ -44,6 +47,7 @@ public class HttpRequestInterceptorUnitCallback implements Callback {
 
     HttpRequestInterceptorUnitCallback(HttpCarbonMessage requestMessage, Runtime runtime,
                                        BallerinaHTTPConnectorListener ballerinaHTTPConnectorListener) {
+        super(requestMessage, runtime);
         this.runtime = runtime;
         this.requestMessage = requestMessage;
         this.requestCtx = (BObject) requestMessage.getProperty(HttpConstants.REQUEST_CONTEXT);
@@ -65,10 +69,9 @@ public class HttpRequestInterceptorUnitCallback implements Callback {
 
     @Override
     public void notifyFailure(BError error) { // handles panic and check_panic
-        if (alreadyResponded()) {
-            return;
-        }
-        invokeErrorInterceptors(error, false);
+        cleanupRequestMessage();
+        sendFailureResponse(error);
+        System.exit(1);
     }
 
     public void invokeErrorInterceptors(BError error, boolean printError) {
@@ -80,21 +83,13 @@ public class HttpRequestInterceptorUnitCallback implements Callback {
     }
 
     public void returnErrorResponse(Object error) {
-        cleanupRequestMessage();
-
-        Object[] paramFeed = new Object[6];
+        Object[] paramFeed = new Object[4];
         paramFeed[0] = error;
         paramFeed[1] = true;
         paramFeed[2] = null;
         paramFeed[3] = true;
-        paramFeed[4] = requestMessage.getHttpStatusCode();
-        paramFeed[5] = true;
 
         invokeBalMethod(paramFeed, "returnErrorResponse");
-    }
-
-    private void cleanupRequestMessage() {
-        requestMessage.waitAndReleaseAllEntities();
     }
 
     private boolean alreadyResponded() {
@@ -146,7 +141,7 @@ public class HttpRequestInterceptorUnitCallback implements Callback {
     }
 
     private boolean isServiceType(Object result) {
-        return result instanceof BObject && ((BObject) result).getType() instanceof ServiceType;
+        return result instanceof BObject && TypeUtils.getType(result) instanceof ServiceType;
     }
 
     private void validateServiceReturnType(Object result, int interceptorId, BArray interceptors) {
@@ -156,9 +151,8 @@ public class HttpRequestInterceptorUnitCallback implements Callback {
                 if (result.equals(interceptor)) {
                     sendRequestToNextService();
                 } else {
-                    BError err = HttpUtil.createHttpError("next interceptor service did not match with the " +
-                                                          "configuration", HttpErrorType.INTERCEPTOR_RETURN_ERROR);
-                    requestMessage.setHttpStatusCode(500);
+                    String message = "next interceptor service did not match with the configuration";
+                    BError err = HttpUtil.createHttpStatusCodeError(INTERCEPTOR_RETURN_ERROR, message);
                     invokeErrorInterceptors(err, true);
                 }
             } else {
@@ -166,9 +160,8 @@ public class HttpRequestInterceptorUnitCallback implements Callback {
                 if (result.equals(targetService)) {
                     sendRequestToNextService();
                 } else {
-                    BError err = HttpUtil.createHttpError("target service did not match with the configuration",
-                                                          HttpErrorType.INTERCEPTOR_RETURN_ERROR);
-                    requestMessage.setHttpStatusCode(500);
+                    String message = "target service did not match with the configuration";
+                    BError err = HttpUtil.createHttpStatusCodeError(INTERCEPTOR_RETURN_ERROR, message);
                     invokeErrorInterceptors(err, true);
                 }
             }
@@ -189,7 +182,7 @@ public class HttpRequestInterceptorUnitCallback implements Callback {
         invokeBalMethod(paramFeed, "returnResponse");
     }
 
-    private void invokeBalMethod(Object[] paramFeed, String methodName) {
+    public void invokeBalMethod(Object[] paramFeed, String methodName) {
         Callback returnCallback = new Callback() {
             @Override
             public void notifySuccess(Object result) {

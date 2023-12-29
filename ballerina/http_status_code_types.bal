@@ -25,7 +25,7 @@ public type StatusCodeResponse Continue|SwitchingProtocols|Processing|EarlyHints
     Locked|FailedDependency|TooEarly|PreconditionRequired|UnavailableDueToLegalReasons|UpgradeRequired|TooManyRequests|
     RequestHeaderFieldsTooLarge|InternalServerError|NotImplemented|BadGateway|ServiceUnavailable|GatewayTimeout|
     HttpVersionNotSupported|VariantAlsoNegotiates|InsufficientStorage|LoopDetected|NotExtended|
-    NetworkAuthorizationRequired;
+    NetworkAuthenticationRequired;
 
 # Defines the possible success status code response record types.
 type SuccessStatusCodeResponse Ok|Created|Accepted|NonAuthoritativeInformation|NoContent|ResetContent|
@@ -418,12 +418,12 @@ public readonly class StatusUpgradeRequired {
     public STATUS_UPGRADE_REQUIRED code = STATUS_UPGRADE_REQUIRED;
 }
 
-# Represents the status code of `STATUS_PREDICTION_REQUIRED`.
+# Represents the status code of `STATUS_PRECONDITION_REQUIRED`.
 #
 # + code - The response status code
 public readonly class StatusPreconditionRequired {
     *Status;
-    public STATUS_PREDICTION_REQUIRED code = STATUS_PREDICTION_REQUIRED;
+    public STATUS_PRECONDITION_REQUIRED code = STATUS_PRECONDITION_REQUIRED;
 }
 
 # Represents the status code of `STATUS_TOO_MANY_REQUESTS`.
@@ -530,12 +530,12 @@ public readonly class StatusNotExtended {
     public STATUS_NOT_EXTENDED code = STATUS_NOT_EXTENDED;
 }
 
-# Represents the status code of `STATUS_NETWORK_AUTHORIZATION_REQUIRED`.
+# Represents the status code of `STATUS_NETWORK_AUTHENTICATION_REQUIRED`.
 #
 # + code - The response status code
-public readonly class StatusNetworkAuthorizationRequired {
+public readonly class StatusNetworkAuthenticationRequired {
     *Status;
-    public STATUS_NETWORK_AUTHORIZATION_REQUIRED code = STATUS_NETWORK_AUTHORIZATION_REQUIRED;
+    public STATUS_NETWORK_AUTHENTICATION_REQUIRED code = STATUS_NETWORK_AUTHENTICATION_REQUIRED;
 }
 
 // Status code object initialization
@@ -584,7 +584,7 @@ final StatusUnprocessableEntity STATUS_UNPROCESSABLE_ENTITY_OBJ = new;
 final StatusLocked STATUS_LOCKED_OBJ = new;
 final StatusFailedDependency STATUS_FAILED_DEPENDENCY_OBJ = new;
 final StatusTooEarly STATUS_TOO_EARLY_OBJ = new;
-final StatusPreconditionRequired STATUS_PREDICTION_REQUIRED_OBJ = new;
+final StatusPreconditionRequired STATUS_PRECONDITION_REQUIRED_OBJ = new;
 final StatusUnavailableDueToLegalReasons STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ = new;
 final StatusUpgradeRequired STATUS_UPGRADE_REQUIRED_OBJ = new;
 final StatusTooManyRequests STATUS_TOO_MANY_REQUESTS_OBJ = new;
@@ -599,7 +599,7 @@ final StatusVariantAlsoNegotiates STATUS_VARIANT_ALSO_NEGOTIATES_OBJ = new;
 final StatusInsufficientStorage STATUS_INSUFFICIENT_STORAGE_OBJ = new;
 final StatusLoopDetected STATUS_LOOP_DETECTED_OBJ = new;
 final StatusNotExtended STATUS_NOT_EXTENDED_OBJ = new;
-final StatusNetworkAuthorizationRequired STATUS_NETWORK_AUTHORIZATION_REQUIRED_OBJ = new;
+final StatusNetworkAuthenticationRequired STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ = new;
 
 // Status code record types
 # The status code response record of `Continue`.
@@ -968,7 +968,7 @@ public type TooEarly record {|
 # + status - The response status code obj
 public type PreconditionRequired record {|
     *CommonResponse;
-    readonly StatusPreconditionRequired status = STATUS_PREDICTION_REQUIRED_OBJ;
+    readonly StatusPreconditionRequired status = STATUS_PRECONDITION_REQUIRED_OBJ;
 |};
 
 # The status code response record of `UnavailableDueToLegalReasons`.
@@ -1086,9 +1086,20 @@ public type NotExtended record {|
 # The status code response record of `NetworkAuthorizationRequired`.
 #
 # + status - The response status code obj
+# # Deprecated
+# This record is deprecated. Please use `NetworkAuthenticationRequired` instead.
+@deprecated
 public type NetworkAuthorizationRequired record {|
     *CommonResponse;
-    readonly StatusNetworkAuthorizationRequired status = STATUS_NETWORK_AUTHORIZATION_REQUIRED_OBJ;
+    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ;
+|};
+
+# The status code response record of `NetworkAuthenticationRequired`.
+#
+# + status - The response status code obj
+public type NetworkAuthenticationRequired record {|
+    *CommonResponse;
+    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ;
 |};
 
 # The common status code response constant of `Continue`.
@@ -1271,5 +1282,5 @@ public final readonly & LoopDetected LOOP_DETECTED = {};
 # The common status code response constant of `NotExtended`.
 public final readonly & NotExtended NOT_EXTENDED = {};
 
-# The common status code response constant of `NetworkAuthorizationRequired`.
-public final readonly & NetworkAuthorizationRequired NETWORK_AUTHORIZATION_REQUIRED = {};
+# The common status code response constant of `NetworkAuthenticationRequired`.
+public final readonly & NetworkAuthenticationRequired NETWORK_AUTHENTICATION_REQUIRED = {};

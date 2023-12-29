@@ -48,8 +48,10 @@ public class HttpCallableUnitCallback implements Callback {
     private final BMap cacheConfig;
     private final HttpCarbonMessage requestMessage;
     private final BMap links;
+    private final boolean isLastService;
 
-    HttpCallableUnitCallback(HttpCarbonMessage requestMessage, Runtime runtime, HttpResource resource) {
+    HttpCallableUnitCallback(HttpCarbonMessage requestMessage, Runtime runtime, HttpResource resource,
+                             boolean isLastService) {
         this.requestMessage = requestMessage;
         this.runtime = runtime;
         this.returnMediaType = resource.getReturnMediaType();
@@ -57,6 +59,7 @@ public class HttpCallableUnitCallback implements Callback {
         this.links = resource.getLinks();
         String resourceAccessor = resource.getBalResource().getAccessor().toUpperCase(Locale.getDefault());
         this.caller = getCaller(requestMessage, resourceAccessor);
+        this.isLastService = isLastService;
     }
 
     HttpCallableUnitCallback(HttpCarbonMessage requestMessage, Runtime runtime) {
@@ -66,6 +69,7 @@ public class HttpCallableUnitCallback implements Callback {
         this.cacheConfig = null;
         this.links = null;
         this.caller = getCaller(requestMessage, null);
+        this.isLastService = false;
     }
 
     public Runtime getRuntime() {
@@ -83,7 +87,6 @@ public class HttpCallableUnitCallback implements Callback {
 
     @Override
     public void notifySuccess(Object result) {
-        cleanupRequestMessage();
         if (alreadyResponded(result)) {
             stopObserverContext();
             return;
@@ -91,6 +94,9 @@ public class HttpCallableUnitCallback implements Callback {
         if (result instanceof BError) {
             invokeErrorInterceptors((BError) result, true);
             return;
+        }
+        if (isLastService) {
+            cleanupRequestMessage();
         }
         returnResponse(result);
     }
@@ -110,13 +116,11 @@ public class HttpCallableUnitCallback implements Callback {
     }
 
     private void returnErrorResponse(BError error) {
-        Object[] paramFeed = new Object[6];
+        Object[] paramFeed = new Object[4];
         paramFeed[0] = error;
         paramFeed[1] = true;
         paramFeed[2] = returnMediaType != null ? StringUtils.fromString(returnMediaType) : null;
         paramFeed[3] = true;
-        paramFeed[4] = requestMessage.getHttpStatusCode();
-        paramFeed[5] = true;
 
         invokeBalMethod(paramFeed, "returnErrorResponse");
     }
@@ -127,10 +131,6 @@ public class HttpCallableUnitCallback implements Callback {
             public void notifySuccess(Object result) {
                 stopObserverContext();
                 printStacktraceIfError(result);
-                Object isPanic = requestMessage.getProperty(HttpConstants.INTERCEPTOR_SERVICE_PANIC_ERROR);
-                if (Objects.nonNull(isPanic) && (boolean) isPanic) {
-                    System.exit(1);
-                }
             }
 
             @Override
@@ -155,19 +155,15 @@ public class HttpCallableUnitCallback implements Callback {
 
     @Override
     public void notifyFailure(BError error) { // handles panic and check_panic
-        cleanupRequestMessage();
-        // This check is added to update the status code with respect to the auth errors.
-        if (error.getType().getName().equals(HttpErrorType.INTERNAL_LISTENER_AUTHN_ERROR.getErrorName())) {
-            requestMessage.setHttpStatusCode(401);
-        } else if (error.getType().getName().equals(HttpErrorType.INTERNAL_LISTENER_AUTHZ_ERROR.getErrorName())) {
-            requestMessage.setHttpStatusCode(403);
-        } else {
-            requestMessage.setProperty(HttpConstants.INTERCEPTOR_SERVICE_PANIC_ERROR, true);
-        }
-        if (alreadyResponded(error)) {
+        // Allow the panics from internal authentication/authorization to be handled by the interceptors.
+        if (error.getType().getName().equals(HttpErrorType.INTERNAL_LISTENER_AUTHN_ERROR.getErrorName())
+                || error.getType().getName().equals(HttpErrorType.INTERNAL_LISTENER_AUTHZ_ERROR.getErrorName())) {
+            invokeErrorInterceptors(error, true);
             return;
         }
-        invokeErrorInterceptors(error, true);
+        cleanupRequestMessage();
+        sendFailureResponse(error);
+        System.exit(1);
     }
 
     public void invokeErrorInterceptors(BError error, boolean printError) {
@@ -183,7 +179,7 @@ public class HttpCallableUnitCallback implements Callback {
         HttpUtil.handleFailure(requestMessage, error, true);
     }
 
-    private void cleanupRequestMessage() {
+    public void cleanupRequestMessage() {
         requestMessage.waitAndReleaseAllEntities();
     }
 

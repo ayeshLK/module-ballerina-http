@@ -36,24 +36,24 @@ public enum HttpDiagnosticCodes {
     HTTP_103("HTTP_103", "invalid resource method annotation type: expected 'http:" + RESOURCE_CONFIG_ANNOTATION +
             "', but found '%s'", ERROR),
     HTTP_104("HTTP_104", "invalid annotation type on param '%s': expected one of the following types: " +
-            "'http:Payload', 'http:CallerInfo', 'http:Headers'", ERROR),
+            "'http:Payload', 'http:CallerInfo', 'http:Header', 'http:Query'", ERROR),
     HTTP_105("HTTP_105", "invalid resource parameter '%s'", ERROR),
     HTTP_106("HTTP_106", "invalid resource parameter type: '%s'", ERROR),
     HTTP_107("HTTP_107", "invalid payload parameter type: '%s'", ERROR),
-    HTTP_108("HTTP_108", "invalid multiple resource parameter annotations for '%s'" +
-            ": expected one of the following types: 'http:Payload', 'http:CallerInfo', 'http:Header'", ERROR),
-    HTTP_109("HTTP_109", "invalid type of header param '%s': One of the following types is expected: " +
+    HTTP_108("HTTP_108", "invalid multiple resource parameter annotations for '%s': expected one of the following" +
+            " types: 'http:Payload', 'http:CallerInfo', 'http:Header', 'http:Query'", ERROR),
+    HTTP_109("HTTP_109", "invalid type of header param '%s': expected one of the following types is expected: " +
             "'string','int','float','decimal','boolean', an array of the above types or a record which consists of " +
             "the above types", ERROR),
-    HTTP_110("HTTP_110", "invalid union type of header param '%s': one of the 'string','int','float'," +
+    HTTP_110("HTTP_110", "invalid union type of header param '%s': expected one of the 'string','int','float'," +
             "'decimal','boolean' types, an array of the above types or a record which consists of the above types can" +
             " only be union with '()'. Eg: string|() or string[]|()", ERROR),
     HTTP_111("HTTP_111", "invalid type of caller param '%s': expected 'http:Caller'", ERROR),
     HTTP_112("HTTP_112", "invalid type of query param '%s': expected one of the 'string', 'int', 'float', " +
-            "'boolean', 'decimal', 'map<json>' types or the array types of them", ERROR),
+            "'boolean', 'decimal', 'map<anydata>' types or the array types of them", ERROR),
     HTTP_113("HTTP_113", "invalid union type of query param '%s': 'string', 'int', 'float', 'boolean', " +
-            "'decimal', 'map<json>' type or the array types of them can only be union with '()'. Eg: string? or int[]?",
-            ERROR),
+            "'decimal', 'map<anydata>' type or the array types of them can only be union with '()'. Eg: string?" +
+            " or int[]?", ERROR),
     HTTP_114("HTTP_114", "incompatible respond method argument type : expected '%s' according " +
             "to the 'http:CallerInfo' annotation", ERROR),
     HTTP_115("HTTP_115", "invalid multiple 'http:Caller' parameter: '%s'", ERROR),
@@ -91,20 +91,25 @@ public enum HttpDiagnosticCodes {
     HTTP_138("HTTP_138", "invalid remote function : '%s'. %s can have only '%s' remote " +
             "function", ERROR),
     HTTP_139("HTTP_139", "invalid multiple 'http:Response' parameter: '%s'", ERROR),
-    HTTP_140("HTTP_140", "invalid parameter type: '%s' in 'interceptResponse' remote method", ERROR),
+    HTTP_140("HTTP_140", "invalid parameter type: '%s' in '%s' remote method", ERROR),
     HTTP_141("HTTP_141", "invalid interceptor remote method return type: expected '" +
             ALLOWED_INTERCEPTOR_RETURN_UNION + "', but found '%s'", ERROR),
     HTTP_142("HTTP_142", "return type annotation is not supported in interceptor service", ERROR),
     HTTP_143("HTTP_143", "%s function should have the mandatory parameter 'error'", ERROR),
     HTTP_144("HTTP_144", "rest fields are not allowed for header binding records. Use 'http:Headers' type to access " +
             "all headers", ERROR),
-    HTTP_145("HTTP_145", "incompatible record field type: '%s' in payload parameter: '%s'", ERROR),
+    HTTP_145("HTTP_145", "invalid resource path parameter '%s': expected one of the 'string','int','float'," +
+            "'decimal','boolean' types or a rest parameter with one of the above types", ERROR),
     HTTP_146("HTTP_146", "resource link name: '%s' conflicts with the path. Resource names can be reused only when " +
             "the resources have the same path", ERROR),
     HTTP_147("HTTP_147", "duplicate link relation: '%s'. Resource only supports unique relations" , ERROR),
     HTTP_148("HTTP_148", "cannot find resource with resource link name: '%s'" , ERROR),
     HTTP_149("HTTP_149", "cannot resolve linked resource without method" , ERROR),
     HTTP_150("HTTP_150", "cannot find '%s' resource with resource link name: '%s'" , ERROR),
+
+    HTTP_151("HTTP_151", "ambiguous types for parameter '%s' and '%s'. Use annotations to avoid ambiguity", ERROR),
+    HTTP_152("HTTP_152", "invalid union type for default payload param: '%s'. Use basic structured anydata types",
+            ERROR),
 
     HTTP_HINT_101("HTTP_HINT_101", "Payload annotation can be added", INTERNAL),
     HTTP_HINT_102("HTTP_HINT_102", "Header annotation can be added", INTERNAL),

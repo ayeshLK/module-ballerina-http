@@ -18,18 +18,15 @@
 
 package io.ballerina.stdlib.http.compiler;
 
-import io.ballerina.compiler.api.symbols.ArrayTypeSymbol;
+import io.ballerina.compiler.api.Types;
 import io.ballerina.compiler.api.symbols.FunctionSymbol;
 import io.ballerina.compiler.api.symbols.FunctionTypeSymbol;
 import io.ballerina.compiler.api.symbols.IntersectionTypeSymbol;
-import io.ballerina.compiler.api.symbols.MapTypeSymbol;
 import io.ballerina.compiler.api.symbols.ModuleSymbol;
 import io.ballerina.compiler.api.symbols.Symbol;
-import io.ballerina.compiler.api.symbols.TableTypeSymbol;
+import io.ballerina.compiler.api.symbols.TypeDefinitionSymbol;
 import io.ballerina.compiler.api.symbols.TypeDescKind;
-import io.ballerina.compiler.api.symbols.TypeReferenceTypeSymbol;
 import io.ballerina.compiler.api.symbols.TypeSymbol;
-import io.ballerina.compiler.api.symbols.UnionTypeSymbol;
 import io.ballerina.compiler.syntax.tree.AnnotationNode;
 import io.ballerina.compiler.syntax.tree.FunctionDefinitionNode;
 import io.ballerina.compiler.syntax.tree.Node;
@@ -41,39 +38,64 @@ import io.ballerina.tools.diagnostics.DiagnosticInfo;
 import io.ballerina.tools.diagnostics.DiagnosticProperty;
 import io.ballerina.tools.diagnostics.Location;
 
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
+import static io.ballerina.stdlib.http.compiler.Constants.ANYDATA;
+import static io.ballerina.stdlib.http.compiler.Constants.ARRAY_OF_MAP_OF_ANYDATA;
 import static io.ballerina.stdlib.http.compiler.Constants.BALLERINA;
+import static io.ballerina.stdlib.http.compiler.Constants.BOOLEAN;
+import static io.ballerina.stdlib.http.compiler.Constants.BOOLEAN_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.BYTE_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.CALLER_OBJ_NAME;
+import static io.ballerina.stdlib.http.compiler.Constants.DECIMAL;
+import static io.ballerina.stdlib.http.compiler.Constants.DECIMAL_ARRAY;
 import static io.ballerina.stdlib.http.compiler.Constants.EMPTY;
+import static io.ballerina.stdlib.http.compiler.Constants.ERROR;
+import static io.ballerina.stdlib.http.compiler.Constants.FLOAT;
+import static io.ballerina.stdlib.http.compiler.Constants.FLOAT_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.HEADER_OBJ_NAME;
 import static io.ballerina.stdlib.http.compiler.Constants.HTTP;
+import static io.ballerina.stdlib.http.compiler.Constants.INT;
+import static io.ballerina.stdlib.http.compiler.Constants.INTERCEPTOR_RESOURCE_RETURN_TYPE;
+import static io.ballerina.stdlib.http.compiler.Constants.INT_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.JSON;
+import static io.ballerina.stdlib.http.compiler.Constants.MAP_OF_ANYDATA;
+import static io.ballerina.stdlib.http.compiler.Constants.NIL;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_BOOLEAN;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_BOOLEAN_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_DECIMAL;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_DECIMAL_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_FLOAT;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_FLOAT_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_INT;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_INT_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_MAP_OF_ANYDATA;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_MAP_OF_ANYDATA_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_STRING;
+import static io.ballerina.stdlib.http.compiler.Constants.NILABLE_STRING_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.OBJECT;
+import static io.ballerina.stdlib.http.compiler.Constants.REQUEST_CONTEXT_OBJ_NAME;
+import static io.ballerina.stdlib.http.compiler.Constants.REQUEST_OBJ_NAME;
+import static io.ballerina.stdlib.http.compiler.Constants.RESOURCE_RETURN_TYPE;
 import static io.ballerina.stdlib.http.compiler.Constants.RESPONSE_OBJ_NAME;
-import static io.ballerina.stdlib.http.compiler.Constants.STATUS_CODE_RESPONSE;
+import static io.ballerina.stdlib.http.compiler.Constants.STRING;
+import static io.ballerina.stdlib.http.compiler.Constants.STRING_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.STRUCTURED_ARRAY;
+import static io.ballerina.stdlib.http.compiler.Constants.TABLE_OF_ANYDATA_MAP;
+import static io.ballerina.stdlib.http.compiler.Constants.TUPLE_OF_ANYDATA;
 import static io.ballerina.stdlib.http.compiler.Constants.UNNECESSARY_CHARS_REGEX;
+import static io.ballerina.stdlib.http.compiler.Constants.XML;
 
 /**
  * Utility class providing http compiler plugin utility methods.
  */
-public class HttpCompilerPluginUtil {
+public final class HttpCompilerPluginUtil {
 
-    private static final List<TypeDescKind> ALLOWED_PAYLOAD_TYPES = Arrays.asList(
-            TypeDescKind.BOOLEAN, TypeDescKind.INT, TypeDescKind.FLOAT, TypeDescKind.DECIMAL,
-            TypeDescKind.STRING, TypeDescKind.XML, TypeDescKind.JSON,
-            TypeDescKind.ANYDATA, TypeDescKind.NIL, TypeDescKind.BYTE, TypeDescKind.STRING_CHAR,
-            TypeDescKind.XML_ELEMENT, TypeDescKind.XML_COMMENT, TypeDescKind.XML_PROCESSING_INSTRUCTION,
-            TypeDescKind.XML_TEXT, TypeDescKind.INT_SIGNED8, TypeDescKind.INT_UNSIGNED8,
-            TypeDescKind.INT_SIGNED16, TypeDescKind.INT_UNSIGNED16, TypeDescKind.INT_SIGNED32,
-            TypeDescKind.INT_UNSIGNED32);
-    private static final List<TypeDescKind> ALLOWED_RETURN_TYPES = Arrays.asList(
-            TypeDescKind.BOOLEAN, TypeDescKind.INT, TypeDescKind.FLOAT, TypeDescKind.DECIMAL,
-            TypeDescKind.STRING, TypeDescKind.XML, TypeDescKind.JSON,
-            TypeDescKind.ANYDATA, TypeDescKind.RECORD, TypeDescKind.NIL, TypeDescKind.BYTE, TypeDescKind.STRING_CHAR,
-            TypeDescKind.XML_ELEMENT, TypeDescKind.XML_COMMENT, TypeDescKind.XML_PROCESSING_INSTRUCTION,
-            TypeDescKind.XML_TEXT, TypeDescKind.INT_SIGNED8, TypeDescKind.INT_UNSIGNED8,
-            TypeDescKind.INT_SIGNED16, TypeDescKind.INT_UNSIGNED16, TypeDescKind.INT_SIGNED32,
-            TypeDescKind.INT_UNSIGNED32);
+    private HttpCompilerPluginUtil() {}
 
     public static void updateDiagnostic(SyntaxNodeAnalysisContext ctx, Location location,
                                         HttpDiagnosticCodes httpDiagnosticCodes) {
@@ -104,6 +126,7 @@ public class HttpCompilerPluginUtil {
     }
 
     public static void extractInterceptorReturnTypeAndValidate(SyntaxNodeAnalysisContext ctx,
+                                                               Map<String, TypeSymbol> typeSymbols,
                                                                FunctionDefinitionNode member,
                                                                HttpDiagnosticCodes httpDiagnosticCode) {
         Optional<ReturnTypeDescriptorNode> returnTypeDescriptorNode = member.functionSignature().returnTypeDesc();
@@ -121,115 +144,32 @@ public class HttpCompilerPluginUtil {
         if (returnTypeSymbol.isEmpty()) {
             return;
         }
-        validateReturnType(ctx, returnTypeNode, returnType, returnTypeSymbol.get(), httpDiagnosticCode, true);
+        validateResourceReturnType(ctx, returnTypeNode, typeSymbols, returnType, returnTypeSymbol.get(),
+                httpDiagnosticCode, true);
         NodeList<AnnotationNode> annotations = returnTypeDescriptorNode.get().annotations();
         if (!annotations.isEmpty()) {
             reportReturnTypeAnnotationsAreNotAllowed(ctx, returnTypeDescriptorNode.get());
         }
     }
 
-    public static void validateReturnType(SyntaxNodeAnalysisContext ctx, Node node, String returnTypeStringValue,
-                                           TypeSymbol returnTypeSymbol, HttpDiagnosticCodes diagnosticCode,
-                                           boolean isInterceptorType) {
-        if (isInterceptorType && isServiceType(returnTypeSymbol)) {
+    public static void validateResourceReturnType(SyntaxNodeAnalysisContext ctx, Node node,
+                                                  Map<String, TypeSymbol> typeSymbols, String returnTypeStringValue,
+                                                  TypeSymbol returnTypeSymbol, HttpDiagnosticCodes diagnosticCode,
+                                                  boolean isInterceptorType) {
+        if (subtypeOf(typeSymbols, returnTypeSymbol,
+                isInterceptorType ? INTERCEPTOR_RESOURCE_RETURN_TYPE : RESOURCE_RETURN_TYPE)) {
             return;
         }
-        TypeDescKind kind = returnTypeSymbol.typeKind();
-        if (isAllowedReturnType(kind) || kind == TypeDescKind.ERROR || kind == TypeDescKind.NIL ||
-                kind == TypeDescKind.ANYDATA || kind == TypeDescKind.SINGLETON) {
-            return;
-        }
-        if (kind == TypeDescKind.INTERSECTION) {
-            TypeSymbol typeSymbol = ((IntersectionTypeSymbol) returnTypeSymbol).effectiveTypeDescriptor();
-            validateReturnType(ctx, node, returnTypeStringValue, typeSymbol, diagnosticCode, isInterceptorType);
-        } else if (kind == TypeDescKind.UNION) {
-            List<TypeSymbol> typeSymbols = ((UnionTypeSymbol) returnTypeSymbol).memberTypeDescriptors();
-            for (TypeSymbol typeSymbol : typeSymbols) {
-                validateReturnType(ctx, node, returnTypeStringValue, typeSymbol, diagnosticCode, isInterceptorType);
-            }
-        } else if (kind == TypeDescKind.ARRAY) {
-            TypeSymbol memberTypeDescriptor = ((ArrayTypeSymbol) returnTypeSymbol).memberTypeDescriptor();
-            validateArrayElementTypeInReturnType(
-                    ctx, node, returnTypeStringValue, memberTypeDescriptor, diagnosticCode);
-        } else if (kind == TypeDescKind.TYPE_REFERENCE) {
-            TypeSymbol typeDescriptor = ((TypeReferenceTypeSymbol) returnTypeSymbol).typeDescriptor();
-            TypeDescKind typeDescKind = retrieveEffectiveTypeDesc(typeDescriptor);
-            if (typeDescKind == TypeDescKind.OBJECT) {
-                if (!isHttpModuleType(RESPONSE_OBJ_NAME, typeDescriptor)) {
-                    reportInvalidReturnType(ctx, node, returnTypeStringValue, diagnosticCode);
-                }
-            } else {
-                validateReturnType(ctx, node, returnTypeStringValue, typeDescriptor, diagnosticCode, isInterceptorType);
-            }
-        } else if (kind == TypeDescKind.MAP) {
-            TypeSymbol typeSymbol = ((MapTypeSymbol) returnTypeSymbol).typeParam();
-            validateReturnType(ctx, node, returnTypeStringValue, typeSymbol, diagnosticCode, false);
-        } else if (kind == TypeDescKind.TABLE) {
-            TypeSymbol typeSymbol = ((TableTypeSymbol) returnTypeSymbol).rowTypeParameter();
-            if (typeSymbol == null) {
-                reportInvalidReturnType(ctx, node, returnTypeStringValue, diagnosticCode);
-            } else {
-                validateReturnType(ctx, node, returnTypeStringValue, typeSymbol, diagnosticCode, false);
-            }
-        } else {
-            reportInvalidReturnType(ctx, node, returnTypeStringValue, diagnosticCode);
-        }
+        reportInvalidReturnType(ctx, node, returnTypeStringValue, diagnosticCode);
     }
 
-    private static boolean isServiceType(TypeSymbol returnTypeSymbol) {
-        Optional<String> optionalTypeName = returnTypeSymbol.getName();
-        return optionalTypeName.filter(typeName -> typeName.equals(Constants.SERVICE) ||
-                typeName.equals(Constants.REQUEST_INTERCEPTOR) ||
-                typeName.equals(Constants.RESPONSE_INTERCEPTOR)).isPresent();
-    }
-
-    private static void validateArrayElementTypeInReturnType(SyntaxNodeAnalysisContext ctx, Node node,
-                                                             String typeStringValue, TypeSymbol memberTypeDescriptor,
-                                                             HttpDiagnosticCodes diagnosticCode) {
-        TypeDescKind kind = memberTypeDescriptor.typeKind();
-        if (isAllowedReturnType(kind) || kind == TypeDescKind.RECORD || kind == TypeDescKind.MAP ||
-                kind == TypeDescKind.TABLE) {
-            return;
+    public static boolean subtypeOf(Map<String, TypeSymbol> typeSymbols, TypeSymbol typeSymbol,
+                                    String targetTypeName) {
+        TypeSymbol targetTypeSymbol = typeSymbols.get(targetTypeName);
+        if (targetTypeSymbol != null) {
+            return typeSymbol.subtypeOf(targetTypeSymbol);
         }
-        if (kind == TypeDescKind.INTERSECTION) {
-            TypeSymbol typeSymbol = ((IntersectionTypeSymbol) memberTypeDescriptor).effectiveTypeDescriptor();
-            validateArrayElementTypeInReturnType(ctx, node, typeStringValue, typeSymbol,
-                    diagnosticCode);
-        } else if (kind == TypeDescKind.TYPE_REFERENCE) {
-            if (isHttpModuleType(STATUS_CODE_RESPONSE, memberTypeDescriptor)) {
-                reportInvalidReturnType(ctx, node, typeStringValue, diagnosticCode);
-                return;
-            }
-            TypeSymbol typeDescriptor = ((TypeReferenceTypeSymbol) memberTypeDescriptor).typeDescriptor();
-            TypeDescKind typeDescKind = retrieveEffectiveTypeDesc(typeDescriptor);
-            if (typeDescKind == TypeDescKind.OBJECT || typeDescKind == TypeDescKind.ERROR) {
-                reportInvalidReturnType(ctx, node, typeStringValue, diagnosticCode);
-            } else if (typeDescKind == TypeDescKind.UNION) {
-                List<TypeSymbol> typeSymbols = ((UnionTypeSymbol) typeDescriptor).userSpecifiedMemberTypes();
-                for (TypeSymbol typeSymbol : typeSymbols) {
-                    TypeDescKind effectiveTypeDesc = retrieveEffectiveTypeDesc(typeSymbol);
-                    if (effectiveTypeDesc == TypeDescKind.OBJECT || effectiveTypeDesc == TypeDescKind.ERROR) {
-                        reportInvalidReturnType(ctx, node, typeStringValue, diagnosticCode);
-                        return;
-                    } else if (effectiveTypeDesc == TypeDescKind.TYPE_REFERENCE) {
-                        if (isHttpModuleType(STATUS_CODE_RESPONSE, typeSymbol)) {
-                            reportInvalidReturnType(ctx, node, typeStringValue, diagnosticCode);
-                            return;
-                        }
-                        validateArrayElementTypeInReturnType(ctx, node, typeStringValue, typeSymbol, diagnosticCode);
-                    } else {
-                        validateReturnType(ctx, node, typeStringValue, typeSymbol, diagnosticCode, false);
-                    }
-                }
-            } else {
-                validateReturnType(ctx, node, typeStringValue, typeDescriptor, diagnosticCode, false);
-            }
-        } else if (kind == TypeDescKind.ARRAY) {
-            memberTypeDescriptor = ((ArrayTypeSymbol) memberTypeDescriptor).memberTypeDescriptor();
-            validateArrayElementTypeInReturnType(ctx, node, typeStringValue, memberTypeDescriptor, diagnosticCode);
-        } else {
-            reportInvalidReturnType(ctx, node, typeStringValue, diagnosticCode);
-        }
+        return false;
     }
 
     public static boolean isHttpModuleType(String expectedType, TypeSymbol typeDescriptor) {
@@ -247,20 +187,16 @@ public class HttpCompilerPluginUtil {
         return expectedType.equals(typeName.get());
     }
 
+    public static boolean isHttpModule(ModuleSymbol moduleSymbol) {
+        return HTTP.equals(moduleSymbol.getName().get()) && BALLERINA.equals(moduleSymbol.id().orgName());
+    }
+
     public static TypeDescKind retrieveEffectiveTypeDesc(TypeSymbol descriptor) {
         TypeDescKind typeDescKind = descriptor.typeKind();
         if (typeDescKind == TypeDescKind.INTERSECTION) {
             return ((IntersectionTypeSymbol) descriptor).effectiveTypeDescriptor().typeKind();
         }
         return typeDescKind;
-    }
-
-    public static boolean isAllowedPayloadType(TypeDescKind kind) {
-        return ALLOWED_PAYLOAD_TYPES.stream().anyMatch(allowedKind -> kind == allowedKind);
-    }
-
-    public static boolean isAllowedReturnType(TypeDescKind kind) {
-        return ALLOWED_RETURN_TYPES.stream().anyMatch(allowedKind -> kind == allowedKind);
     }
 
     private static void reportInvalidReturnType(SyntaxNodeAnalysisContext ctx, Node node,
@@ -279,5 +215,98 @@ public class HttpCompilerPluginUtil {
     public static String getNodeString(Node node, boolean isCaseSensitive) {
         String nodeString = node.toString().replaceAll(UNNECESSARY_CHARS_REGEX, EMPTY).trim();
         return isCaseSensitive ? nodeString : nodeString.toLowerCase(Locale.getDefault());
+    }
+
+    public static Map<String, TypeSymbol> getCtxTypes(SyntaxNodeAnalysisContext ctx) {
+        Map<String, TypeSymbol> typeSymbols = new HashMap<>();
+        populateRequiredLangTypes(ctx, typeSymbols);
+        populateHttpModuleTypes(ctx, typeSymbols);
+        return typeSymbols;
+    }
+
+    private static void populateHttpModuleTypes(SyntaxNodeAnalysisContext ctx, Map<String, TypeSymbol> typeSymbols) {
+        String[] requiredTypeNames = {RESOURCE_RETURN_TYPE, INTERCEPTOR_RESOURCE_RETURN_TYPE,
+                CALLER_OBJ_NAME, REQUEST_OBJ_NAME, REQUEST_CONTEXT_OBJ_NAME, HEADER_OBJ_NAME, RESPONSE_OBJ_NAME};
+        Optional<Map<String, Symbol>> optionalMap = ctx.semanticModel().types().typesInModule(BALLERINA, HTTP, EMPTY);
+        if (optionalMap.isPresent()) {
+            Map<String, Symbol> symbolMap = optionalMap.get();
+            for (String typeName : requiredTypeNames) {
+                Symbol symbol = symbolMap.get(typeName);
+                if (symbol instanceof TypeSymbol) {
+                    typeSymbols.put(typeName, (TypeSymbol) symbol);
+                } else if (symbol instanceof TypeDefinitionSymbol) {
+                    typeSymbols.put(typeName, ((TypeDefinitionSymbol) symbol).typeDescriptor());
+                }
+            }
+        }
+    }
+
+    private static void populateRequiredLangTypes(SyntaxNodeAnalysisContext ctx, Map<String, TypeSymbol> typeSymbols) {
+        Types types = ctx.semanticModel().types();
+        populateBasicTypes(typeSymbols, types);
+        populateNilableBasicTypes(typeSymbols, types);
+        populateBasicArrayTypes(typeSymbols, types);
+        populateNilableBasicArrayTypes(typeSymbols, types);
+    }
+
+    private static void populateBasicArrayTypes(Map<String, TypeSymbol> typeSymbols, Types types) {
+        typeSymbols.put(STRING_ARRAY, types.builder().ARRAY_TYPE.withType(types.STRING).build());
+        typeSymbols.put(BOOLEAN_ARRAY, types.builder().ARRAY_TYPE.withType(types.BOOLEAN).build());
+        typeSymbols.put(INT_ARRAY, types.builder().ARRAY_TYPE.withType(types.INT).build());
+        typeSymbols.put(FLOAT_ARRAY, types.builder().ARRAY_TYPE.withType(types.FLOAT).build());
+        typeSymbols.put(DECIMAL_ARRAY, types.builder().ARRAY_TYPE.withType(types.DECIMAL).build());
+        typeSymbols.put(ARRAY_OF_MAP_OF_ANYDATA, types.builder().ARRAY_TYPE.withType(
+                types.builder().MAP_TYPE.withTypeParam(types.ANYDATA).build()).build());
+        typeSymbols.put(STRUCTURED_ARRAY, types.builder().ARRAY_TYPE
+                .withType(
+                        types.builder().UNION_TYPE
+                                .withMemberTypes(
+                                        typeSymbols.get(MAP_OF_ANYDATA),
+                                        typeSymbols.get(TABLE_OF_ANYDATA_MAP),
+                                        typeSymbols.get(TUPLE_OF_ANYDATA)).build()).build());
+        typeSymbols.put(BYTE_ARRAY, types.builder().ARRAY_TYPE.withType(types.BYTE).build());
+    }
+
+    private static void populateBasicTypes(Map<String, TypeSymbol> typeSymbols, Types types) {
+        typeSymbols.put(ANYDATA, types.ANYDATA);
+        typeSymbols.put(JSON, types.JSON);
+        typeSymbols.put(ERROR, types.ERROR);
+        typeSymbols.put(STRING, types.STRING);
+        typeSymbols.put(BOOLEAN, types.BOOLEAN);
+        typeSymbols.put(INT, types.INT);
+        typeSymbols.put(FLOAT, types.FLOAT);
+        typeSymbols.put(DECIMAL, types.DECIMAL);
+        typeSymbols.put(XML, types.XML);
+        typeSymbols.put(NIL, types.NIL);
+        typeSymbols.put(OBJECT, types.builder().OBJECT_TYPE.build());
+        typeSymbols.put(MAP_OF_ANYDATA, types.builder().MAP_TYPE.withTypeParam(types.ANYDATA).build());
+        typeSymbols.put(TABLE_OF_ANYDATA_MAP, types.builder().TABLE_TYPE.withRowType(
+                typeSymbols.get(MAP_OF_ANYDATA)).build());
+        typeSymbols.put(TUPLE_OF_ANYDATA, types.builder().TUPLE_TYPE.withRestType(types.ANYDATA).build());
+    }
+
+    private static void populateNilableBasicTypes(Map<String, TypeSymbol> typeSymbols, Types types) {
+        typeSymbols.put(NILABLE_STRING, types.builder().UNION_TYPE.withMemberTypes(types.STRING, types.NIL).build());
+        typeSymbols.put(NILABLE_BOOLEAN, types.builder().UNION_TYPE.withMemberTypes(types.BOOLEAN, types.NIL).build());
+        typeSymbols.put(NILABLE_INT, types.builder().UNION_TYPE.withMemberTypes(types.INT, types.NIL).build());
+        typeSymbols.put(NILABLE_FLOAT, types.builder().UNION_TYPE.withMemberTypes(types.FLOAT, types.NIL).build());
+        typeSymbols.put(NILABLE_DECIMAL, types.builder().UNION_TYPE.withMemberTypes(types.DECIMAL, types.NIL).build());
+        typeSymbols.put(NILABLE_MAP_OF_ANYDATA, types.builder().UNION_TYPE.withMemberTypes(
+                typeSymbols.get(MAP_OF_ANYDATA), types.NIL).build());
+    }
+
+    private static void populateNilableBasicArrayTypes(Map<String, TypeSymbol> typeSymbols, Types types) {
+        typeSymbols.put(NILABLE_STRING_ARRAY, types.builder().UNION_TYPE.withMemberTypes(
+                typeSymbols.get(STRING_ARRAY), types.NIL).build());
+        typeSymbols.put(NILABLE_BOOLEAN_ARRAY, types.builder().UNION_TYPE.withMemberTypes(
+                typeSymbols.get(BOOLEAN_ARRAY), types.NIL).build());
+        typeSymbols.put(NILABLE_INT_ARRAY, types.builder().UNION_TYPE.withMemberTypes(
+                typeSymbols.get(INT_ARRAY), types.NIL).build());
+        typeSymbols.put(NILABLE_FLOAT_ARRAY, types.builder().UNION_TYPE.withMemberTypes(
+                typeSymbols.get(FLOAT_ARRAY), types.NIL).build());
+        typeSymbols.put(NILABLE_DECIMAL_ARRAY, types.builder().UNION_TYPE.withMemberTypes(
+                typeSymbols.get(DECIMAL_ARRAY), types.NIL).build());
+        typeSymbols.put(NILABLE_MAP_OF_ANYDATA_ARRAY, types.builder().UNION_TYPE.withMemberTypes(
+                typeSymbols.get(ARRAY_OF_MAP_OF_ANYDATA), types.NIL).build());
     }
 }

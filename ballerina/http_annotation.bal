@@ -23,7 +23,6 @@
 # + auth - Service auth configurations
 # + mediaTypeSubtypePrefix - Service specific media-type subtype prefix
 # + treatNilableAsOptional - Treat Nilable parameters as optional
-# + interceptors - An array of interceptor services
 # + openApiDefinition - The generated OpenAPI definition for the HTTP service. This is auto-generated at compile-time if OpenAPI doc auto generation is enabled
 # + validation - Enables the inbound payload validation functionalty which provided by the constraint package. Enabled by default
 public type HttpServiceConfig record {|
@@ -34,7 +33,6 @@ public type HttpServiceConfig record {|
     ListenerAuthConfig[] auth?;
     string mediaTypeSubtypePrefix?;
     boolean treatNilableAsOptional = true;
-    Interceptor[] interceptors?;
     byte[] openApiDefinition = [];
     boolean validation = true;
 |};
@@ -111,6 +109,12 @@ public type HttpHeader record {|
 
 # The annotation which is used to define the Header resource signature parameter.
 public annotation HttpHeader Header on parameter;
+
+# Defines the query resource signature parameter.
+public type HttpQuery record {||};
+
+# The annotation which is used to define the query resource signature parameter.
+public annotation HttpQuery Query on parameter;
 
 # Defines the HTTP response cache configuration. By default the `no-cache` directive is setted to the `cache-control`
 # header. In addition to that `etag` and `last-modified` headers are also added for cache validation.

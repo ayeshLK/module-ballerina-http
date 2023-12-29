@@ -29,6 +29,7 @@ import io.ballerina.stdlib.http.transport.message.HttpCarbonMessage;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,7 +71,7 @@ public class URIUtil {
             List<String> values = new ArrayList<>();
             Set<String> uniqueValues = new HashSet<>();
             for (String val : queryParamValue.split(",")) {
-                String decodedValue = URLDecoder.decode(val, "UTF-8");
+                String decodedValue = URLDecoder.decode(val, StandardCharsets.UTF_8);
                 if (uniqueValues.add(decodedValue)) {
                     values.add(decodedValue);
                 }
@@ -125,9 +126,9 @@ public class URIUtil {
             for (int i = 1; i < splitPathSegment.length; i++) {
                 String[] splitMatrixParam = splitPathSegment[i].split("=");
                 if (splitMatrixParam.length != 2) {
-                    inboundReqMsg.setHttpStatusCode(400);
-                    throw HttpUtil.createHttpError(String.format("found non-matrix parameter '%s' in path '%s'",
-                                                   splitPathSegment[i], path), HttpErrorType.SERVICE_DISPATCHING_ERROR);
+                    String message = String.format("found non-matrix parameter '%s' in path '%s'",
+                            splitPathSegment[i], path);
+                    throw HttpUtil.createHttpStatusCodeError(HttpErrorType.BAD_MATRIX_PARAMS_ERROR, message);
                 }
                 segmentMatrixParams.put(splitMatrixParam[0], splitMatrixParam[1]);
             }

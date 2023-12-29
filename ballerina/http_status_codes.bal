@@ -110,7 +110,7 @@ public const int STATUS_TOO_EARLY = 425;
 # The HTTP response status code: 426 Upgrade Required
 public const int STATUS_UPGRADE_REQUIRED = 426;
 # The HTTP response status code: 428 Precondition Required
-public const int STATUS_PREDICTION_REQUIRED = 428;
+public const int STATUS_PRECONDITION_REQUIRED = 428;
 # The HTTP response status code: 429 Too Many Requests
 public const int STATUS_TOO_MANY_REQUESTS = 429;
 # The HTTP response status code: 431 Request Header Fields Too Large
@@ -139,4 +139,4 @@ public const int STATUS_LOOP_DETECTED = 508;
 # The HTTP response status code: 510 Not Extended
 public const int STATUS_NOT_EXTENDED = 510;
 # The HTTP response status code: 511 Network Authorization Required
-public const int STATUS_NETWORK_AUTHORIZATION_REQUIRED = 511;
+public const int STATUS_NETWORK_AUTHENTICATION_REQUIRED = 511;

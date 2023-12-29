@@ -1,10 +1,10 @@
 fixes:
-  - "ballerina/http/*/::../ballerina/"
+  - "ballerina/http/**/::../ballerina/"
+  - "io/ballerina/stdlib/http/compiler/::./compiler-plugin/src/main/java/io/ballerina/stdlib/http/compiler/"
 
 ignore:
   - "ballerina-tests"
-  - "compiler-plugin-tests"
-  - "native/src/main/java/io/ballerina/stdlib/http/api/testutils"
+  - "test-utils"
 
 coverage:
   precision: 2

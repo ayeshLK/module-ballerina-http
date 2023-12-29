@@ -33,6 +33,23 @@ public type FirstName Name;
 
 public type FullName FirstName;
 
+public type UnionType decimal|string|boolean;
+
+public type Student record {|
+    string name;
+    int age;
+|};
+
+public type StudentArray Student[];
+
+public type StudentMap map<Student>;
+
+public type StudentRest record {|
+    string name;
+    int age;
+    json...;
+|};
+
 service /queryparamservice on QueryBindingEP {
 
     resource function get .(string foo, http:Caller caller, int bar, http:Request req) returns error? {
@@ -96,6 +113,18 @@ service /queryparamservice on QueryBindingEP {
         return x\-Type ?: "default";
     }
 
+    resource function get q11(map<int> obj) returns json {
+        return obj;
+    }
+
+    resource function get q12(map<string|int>? obj) returns json {
+        return obj;
+    }
+
+    resource function get q13(map<UnionType> obj) returns json {
+        return obj;
+    }
+
     resource function get pets(Count count) returns http:Ok {
         http:Ok ok = {body: count};
         return ok;
@@ -117,6 +146,26 @@ service /queryparamservice on QueryBindingEP {
 
     resource function get nestedTypeRef(FullName name) returns string {
         return name;
+    }
+
+    resource function get encodedValuePath/[string valuePath](string? valueQuery) returns string {
+        return valuePath;
+    }
+
+    resource function get student(Student? student) returns Student {
+        return student ?: {name: "John", age: 25};
+    }
+
+    resource function get studentArray(StudentArray? studentArray) returns StudentArray {
+        return studentArray ?: [];
+    }
+
+    resource function get studentMap(StudentMap studentMap) returns StudentMap {
+        return studentMap;
+    }
+
+    resource function get studentRest(StudentRest studentRest) returns StudentRest {
+        return studentRest;
     }
 }
 
@@ -162,6 +211,19 @@ service /default on QueryBindingEP {
             ]) returns json {
         json responseJson = {objects: objs};
         return responseJson;
+    }
+
+    resource function get q5(map<int>[] objs = [{value: 1}, {value: 2}]) returns json {
+        json responseJson = {objects: objs};
+        return responseJson;
+    }
+
+    resource function get student(Student student = {name: "John", age: 25}) returns Student {
+        return student;
+    }
+
+    resource function get studentArray(StudentArray studentArray = [{name: "John", age: 25}]) returns StudentArray {
+        return studentArray;
     }
 }
 
@@ -286,22 +348,24 @@ function testStringQueryBinding() {
 
 //Query params are case sensitive, https://tools.ietf.org/html/rfc7230#page-19
 @test:Config {}
-function testNegativeStringQueryBindingCaseSensitivity() {
+function testNegativeStringQueryBindingCaseSensitivity() returns error? {
     http:Response|error response = queryBindingClient->get("/queryparamservice/?FOO=WSO2&bar=go");
     if response is http:Response {
         test:assertEquals(response.statusCode, 400);
-        common:assertTextPayload(response.getTextPayload(), "no query param value found for 'foo'");
+        check common:assertJsonErrorPayload(check response.getJsonPayload(), "no query param value found for 'foo'",
+            "Bad Request", 400, "/queryparamservice/?FOO=WSO2&bar=go", "GET");
     } else {
         test:assertFail(msg = "Found unexpected output type: " + response.message());
     }
 }
 
 @test:Config {}
-function testNegativeIntQueryBindingCastingError() {
+function testNegativeIntQueryBindingCastingError() returns error? {
     http:Response|error response = queryBindingClient->get("/queryparamservice/?foo=WSO2&bar=go");
     if response is http:Response {
         test:assertEquals(response.statusCode, 400);
-        common:assertTextPayload(response.getTextPayload(), "error in casting query param : 'bar'");
+        check common:assertJsonErrorPayload(check response.getJsonPayload(), "error in casting query param : 'bar'",
+            "Bad Request", 400, "/queryparamservice/?foo=WSO2&bar=go", "GET");
     } else {
         test:assertFail(msg = "Found unexpected output type: " + response.message());
     }
@@ -309,7 +373,8 @@ function testNegativeIntQueryBindingCastingError() {
     response = queryBindingClient->get("/queryparamservice/?foo=WSO2&bar=");
     if response is http:Response {
         test:assertEquals(response.statusCode, 400);
-        common:assertTextPayload(response.getTextPayload(), "error in casting query param : 'bar'");
+        check common:assertJsonErrorPayload(check response.getJsonPayload(), "error in casting query param : 'bar'",
+            "Bad Request", 400, "/queryparamservice/?foo=WSO2&bar=", "GET");
     } else {
         test:assertFail(msg = "Found unexpected output type: " + response.message());
     }
@@ -479,11 +544,12 @@ function testQueryParamTokenWithEscapeChar() {
 }
 
 @test:Config {}
-function testEmptyQueryParamBinding() {
+function testEmptyQueryParamBinding() returns error? {
     http:Response|error response = queryBindingClient->get("/queryparamservice/q9?x-Type");
     if response is http:Response {
         test:assertEquals(response.statusCode, 400);
-        common:assertTextPayload(response.getTextPayload(), "no query param value found for 'x-Type'");
+        check common:assertJsonErrorPayload(check response.getJsonPayload(), "no query param value found for 'x-Type'",
+            "Bad Request", 400, "/queryparamservice/q9?x-Type", "GET");
     } else {
         test:assertFail(msg = "Found unexpected output type: " + response.message());
     }
@@ -537,4 +603,136 @@ function testTypeReferenceConstrainedMapQueryParamBinding() returns error? {
     string jsonEncoded = check url:encode(jsonObj.toJsonString(), "UTF-8");
     http:Response response = check queryBindingClient->get("/queryparamservice/petsMap?count=" + jsonEncoded);
     common:assertJsonPayloadtoJsonString(response.getJsonPayload(), jsonObj);
+}
+
+@test:Config {}
+function testEncodedValuePath() returns error? {
+    http:Response response = check queryBindingClient->get("/queryparamservice/encodedValuePath/CSM-459%2B862?valueQuery=CSM-459%2B862");
+
+    test:assertEquals(response.statusCode, 200, msg = "Found unexpected output");
+    common:assertHeaderValue(check response.getHeader(common:CONTENT_TYPE), common:TEXT_PLAIN);
+    common:assertTextPayload(response.getTextPayload(), "CSM-459+862");
+
+    response = check queryBindingClient->get("/queryparamservice/encodedValuePath/IPX20%25?valueQuery=IPX20%25");
+
+    test:assertEquals(response.statusCode, 200, msg = "Found unexpected output");
+    common:assertHeaderValue(check response.getHeader(common:CONTENT_TYPE), common:TEXT_PLAIN);
+    common:assertTextPayload(response.getTextPayload(), "IPX20%");
+}
+
+@test:Config {}
+function testRecordQueryParamBinding() returns error? {
+    http:Response response = check queryBindingClient->get("/queryparamservice/student");
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), {name: "John", age: 25});
+
+    Student student = {name: "John Doe", age: 25};
+    string studentEncoded = check url:encode(student.toJsonString(), "UTF-8");
+    response = check queryBindingClient->get("/queryparamservice/student?student=" + studentEncoded);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), student);
+}
+
+@test:Config {}
+function testRecordQueryParamBindingNegative() returns error? {
+    map<json> student = {name: "John Doe", address: "Colombo 03"};
+    string studentEncoded = check url:encode(student.toJsonString(), "UTF-8");
+    http:Response response = check queryBindingClient->get("/queryparamservice/student?student=" + studentEncoded);
+    test:assertEquals(response.statusCode, 400, msg = "Found unexpected output");
+}
+
+@test:Config {}
+function testDefaultRecordQueryParamBinding() returns error? {
+    http:Response response = check queryBindingClient->get("/default/student");
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), {name: "John", age: 25});
+
+    Student student = {name: "John Doe", age: 25};
+    string studentEncoded = check url:encode(student.toJsonString(), "UTF-8");
+    response = check queryBindingClient->get("/default/student?student=" + studentEncoded);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), student);
+}
+
+@test:Config {}
+function testRecordArrayQueryParamBinding() returns error? {
+    http:Response response = check queryBindingClient->get("/queryparamservice/studentArray");
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), []);
+
+    Student student1 = {name: "John Doe", age: 25};
+    Student student2 = {name: "Jane Doe", age: 30};
+    Student[] students = [student1, student2];
+    string studentEncoded1 = check url:encode(student1.toJsonString(), "UTF-8");
+    string studentEncoded2 = check url:encode(student2.toJsonString(), "UTF-8");
+    response = check queryBindingClient->get("/queryparamservice/studentArray?studentArray=" + studentEncoded1 +
+                                "," + studentEncoded2);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), students);
+}
+
+@test:Config {}
+function testDefaultRecordArrayQueryParamBinding() returns error? {
+    http:Response response = check queryBindingClient->get("/default/studentArray");
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), [{name: "John", age: 25}]);
+
+    Student student1 = {name: "John Doe", age: 25};
+    Student student2 = {name: "Jane Doe", age: 30};
+    Student[] students = [student1, student2];
+    string studentEncoded1 = check url:encode(student1.toJsonString(), "UTF-8");
+    string studentEncoded2 = check url:encode(student2.toJsonString(), "UTF-8");
+    response = check queryBindingClient->get("/default/studentArray?studentArray=" + studentEncoded1 +
+                                "," + studentEncoded2);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), students);
+}
+
+@test:Config {}
+function testRecordMapQueryParamBinding() returns error? {
+    Student student1 = {name: "John Doe", age: 25};
+    Student student2 = {name: "Jane Doe", age: 30};
+    map<Student> students = {"student1": student1, "student2": student2};
+    string studentsEncoded = check url:encode(students.toJsonString(), "UTF-8");
+    http:Response response = check queryBindingClient->get("/queryparamservice/studentMap?studentMap=" + studentsEncoded);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), students);
+}
+
+@test:Config {}
+function testRecordRestQueryParamBinding() returns error? {
+    StudentRest student = {name: "John Doe", age: 25, "address": "Colombo", "phone": 1234567890};
+    string studentEncoded = check url:encode(student.toJsonString(), "UTF-8");
+    http:Response response = check queryBindingClient->get("/queryparamservice/studentRest?studentRest=" + studentEncoded);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), student);
+}
+
+@test:Config {}
+function testMapOfJsonTypedQueryParamBinding1() returns error? {
+    map<int> mapOfInts = {a: 1, b: 2, c: 3};
+    string mapOfIntsEncoded = check url:encode(mapOfInts.toJsonString(), "UTF-8");
+    http:Response response = check queryBindingClient->get("/queryparamservice/q11?obj=" + mapOfIntsEncoded);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), mapOfInts);
+
+    map<string> mapOfStrings = {a: "a", b: "b", c: "c"};
+    string mapOfStringsEncoded = check url:encode(mapOfStrings.toJsonString(), "UTF-8");
+    response = check queryBindingClient->get("/queryparamservice/q11?obj=" + mapOfStringsEncoded);
+    test:assertEquals(response.statusCode, 400, msg = "Found unexpected output");
+}
+
+@test:Config {}
+function testMapOfJsonTypedQueryParamBinding2() returns error? {
+    map<string|int> mapOfStringsAndInts = {a: "a", b: 2, c: "c"};
+    string mapOfStringsAndIntsEncoded = check url:encode(mapOfStringsAndInts.toJsonString(), "UTF-8");
+    http:Response response = check queryBindingClient->get("/queryparamservice/q12?obj=" + mapOfStringsAndIntsEncoded);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), mapOfStringsAndInts);
+
+    map<string|boolean> mapOfStringsAndFloats = {a: "a", b: true, c: "c"};
+    string mapOfStringsAndFloatsEncoded = check url:encode(mapOfStringsAndFloats.toJsonString(), "UTF-8");
+    response = check queryBindingClient->get("/queryparamservice/q12?obj=" + mapOfStringsAndFloatsEncoded);
+    test:assertEquals(response.statusCode, 400, msg = "Found unexpected output");
+}
+
+@test:Config {}
+function testMapOfJsonTypedQueryParamBinding3() returns error? {
+    map<UnionType> mapOfUnionTypes = {a: "a", b: 2, c: true};
+    string mapOfUnionTypesEncoded = check url:encode(mapOfUnionTypes.toJsonString(), "UTF-8");
+    http:Response response = check queryBindingClient->get("/queryparamservice/q13?obj=" + mapOfUnionTypesEncoded);
+    common:assertJsonPayloadtoJsonString(response.getJsonPayload(), {a: "a", b: 2.0, c: true});
+
+    map<json> mapOfJsons = {a: "a", b: {name: "John", age: 35}, c: 4.56};
+    string mapOfJsonsEncoded = check url:encode(mapOfJsons.toJsonString(), "UTF-8");
+    response = check queryBindingClient->get("/queryparamservice/q13?obj=" + mapOfJsonsEncoded);
+    test:assertEquals(response.statusCode, 400, msg = "Found unexpected output");
 }

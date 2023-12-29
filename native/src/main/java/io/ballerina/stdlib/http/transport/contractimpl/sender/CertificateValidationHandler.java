@@ -56,7 +56,7 @@ public class CertificateValidationHandler extends ChannelInboundHandlerAdapter {
             SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
 
             if (event.isSuccess() && revocationVerifier
-                    .verifyRevocationStatus(sslEngine.getSession().getPeerCertificateChain())) {
+                    .verifyRevocationStatus(sslEngine.getSession().getPeerCertificates())) {
                 ctx.fireChannelRead(evt);
             } else {
                 ctx.close();
@@ -74,7 +74,7 @@ public class CertificateValidationHandler extends ChannelInboundHandlerAdapter {
      */
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        LOG.error("Exception occurred in CertificateValidationHandler.", cause);
+        LOG.error("Exception occurred in CertificateValidationHandler.", cause.getMessage());
         ctx.fireExceptionCaught(cause);
     }
 }

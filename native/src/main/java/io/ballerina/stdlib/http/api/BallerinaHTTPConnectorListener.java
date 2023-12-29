@@ -22,6 +22,8 @@ import io.ballerina.runtime.api.async.Callback;
 import io.ballerina.runtime.api.constants.RuntimeConstants;
 import io.ballerina.runtime.api.types.ObjectType;
 import io.ballerina.runtime.api.utils.TypeUtils;
+import io.ballerina.runtime.api.values.BArray;
+import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.observability.ObservabilityConstants;
@@ -163,7 +165,9 @@ public class BallerinaHTTPConnectorListener implements HttpConnectorListener {
                                                               HttpResource httpResource) {
         boolean isTransactionInfectable = httpResource.isTransactionInfectable();
         Map<String, Object> properties = collectRequestProperties(inboundMessage, isTransactionInfectable);
-        Object[] signatureParams = HttpDispatcher.getSignatureParameters(httpResource, inboundMessage, endpointConfig);
+
+        Object[] signatureParams = HttpDispatcher.getSignatureParameters(httpResource, inboundMessage, endpointConfig,
+                httpServicesRegistry.getRuntime());
 
         if (ObserveUtils.isObservabilityEnabled()) {
             ObserverContext observerContext = new ObserverContext();
@@ -179,10 +183,11 @@ public class BallerinaHTTPConnectorListener implements HttpConnectorListener {
             inboundMessage.setProperty(HttpConstants.OBSERVABILITY_CONTEXT_PROPERTY, observerContext);
         }
         Runtime runtime = httpServicesRegistry.getRuntime();
-        Callback callback = new HttpCallableUnitCallback(inboundMessage, runtime, httpResource);
+        Callback callback = new HttpCallableUnitCallback(inboundMessage, runtime, httpResource,
+                httpServicesRegistry.isPossibleLastService());
         BObject service = httpResource.getParentService().getBalService();
         String resourceName = httpResource.getName();
-        ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(service.getType());
+        ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(TypeUtils.getType(service));
         if (serviceType.isIsolated() && serviceType.isIsolated(resourceName)) {
             runtime.invokeMethodAsyncConcurrently(service, resourceName, null,
                                                   ModuleUtils.getOnMessageMetaData(), callback, properties,
@@ -230,9 +235,9 @@ public class BallerinaHTTPConnectorListener implements HttpConnectorListener {
                                                                          InterceptorResource resource,
                                                                          HTTPInterceptorServicesRegistry registry) {
         Map<String, Object> properties = collectRequestProperties(inboundMessage, true);
-        Object[] signatureParams = HttpDispatcher.getSignatureParameters(resource, inboundMessage, endpointConfig);
-
         Runtime runtime = registry.getRuntime();
+        Object[] signatureParams = HttpDispatcher.getSignatureParameters(resource, inboundMessage, endpointConfig,
+                registry.getRuntime());
         Callback callback = new HttpRequestInterceptorUnitCallback(
                 inboundMessage, runtime, this);
         BObject service = resource.getParentService().getBalService();
@@ -240,7 +245,7 @@ public class BallerinaHTTPConnectorListener implements HttpConnectorListener {
 
         inboundMessage.removeProperty(HttpConstants.INTERCEPTOR_SERVICE_ERROR);
 
-        ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(service.getType());
+        ObjectType serviceType = (ObjectType) TypeUtils.getReferredType(TypeUtils.getType(service));
         if (serviceType.isIsolated() && serviceType.isIsolated(resourceName)) {
             runtime.invokeMethodAsyncConcurrently(service, resourceName, null,
                                                   ModuleUtils.getOnMessageMetaData(), callback, properties,
@@ -289,9 +294,10 @@ public class BallerinaHTTPConnectorListener implements HttpConnectorListener {
         try {
             return HttpDispatcher.findInterceptorResource(interceptorServicesRegistry, inboundMessage);
         } catch (Exception e) {
-            // Return null to continue interception when there is no matching resource or resource method found
+            // Return null to continue interception when there is no matching service, resource or resource method found
             if (e.getMessage().startsWith("no matching resource found for path")
-                    || e.getMessage().startsWith("Method not allowed")) {
+                    || e.getMessage().startsWith("Method not allowed") ||
+                    e.getMessage().startsWith("no matching service found for path")) {
                 return null;
             } else {
                 throw e;
@@ -311,6 +317,16 @@ public class BallerinaHTTPConnectorListener implements HttpConnectorListener {
                                            targetService.getInterceptorServicesRegistries());
             }
         } catch (Exception e) {
+            if (((BArray) listenerLevelInterceptors).size() == 1 &&
+                    e instanceof BError && ((BError) e).getType().getName()
+                    .equals(HttpErrorType.SERVICE_NOT_FOUND_ERROR.getErrorName())) {
+                HttpService singleService = HttpDispatcher.findSingleService(httpServicesRegistry);
+                if (singleService != null && singleService.hasInterceptors()) {
+                    inboundMessage.setProperty(INTERCEPTORS, singleService.getBalInterceptorServicesArray());
+                    inboundMessage.setProperty(INTERCEPTOR_SERVICES_REGISTRIES,
+                            singleService.getInterceptorServicesRegistries());
+                }
+            }
             inboundMessage.setProperty(HttpConstants.TARGET_SERVICE, HttpUtil.createError(e));
         }
     }
