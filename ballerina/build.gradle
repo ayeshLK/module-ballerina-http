@@ -113,6 +113,9 @@ dependencies {
     externalJars(group: 'org.bouncycastle', name: 'bcprov-jdk18on', version: "${bouncycastleVersion}") {
         transitive = false
     }
+    externalJars(group: 'org.bouncycastle', name: 'bcutil-jdk18on', version: "${bouncycastleVersion}") {
+        transitive = false
+    }
     externalJars(group: 'org.bouncycastle', name: 'bcpkix-jdk18on', version: "${bouncycastleVersion}") {
         transitive = false
     }
@@ -161,6 +164,7 @@ task updateTomlFiles {
         def stdlibDependentLz4Version = project.lz4Version
         def stdlibDependentMarshallingVersion = project.marshallingVersion
         def stdlibDependentProtobufVersion = project.protobufVersion
+        def ballerinaToOpenApiVersion = project.ballerinaToOpenApiVersion
 
         def newBallerinaToml = ballerinaTomlFilePlaceHolder.text.replace("@project.version@", project.version)
         newBallerinaToml = newBallerinaToml.replace("@toml.version@", tomlVersion)
@@ -180,6 +184,7 @@ task updateTomlFiles {
         ballerinaTomlFile.text = newBallerinaToml
 
         def newCompilerPluginToml = compilerPluginTomlFilePlaceHolder.text.replace("@project.version@", project.version)
+        newCompilerPluginToml = newCompilerPluginToml.replace("@ballerinaToOpenApiVersion.version@", ballerinaToOpenApiVersion)
         compilerPluginTomlFile.text = newCompilerPluginToml
     }
 }

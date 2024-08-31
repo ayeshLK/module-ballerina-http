@@ -158,6 +158,8 @@ public final class Constants {
     public static final String HTTP_REASON_PHRASE = "HTTP_REASON_PHRASE";
 
     public static final String CHNL_HNDLR_CTX = "CHNL_HNDLR_CTX";
+    public static final String OUTBOUND_ACCESS_LOG_MESSAGES = "OUTBOUND_ACCESS_LOG_MESSAGES";
+    public static final String OUTBOUND_ACCESS_LOG_MESSAGE = "OUTBOUND_ACCESS_LOG_MESSAGE";
 
     public static final String SRC_HANDLER = "SRC_HANDLER";
     public static final String POOLED_BYTE_BUFFER_FACTORY = "POOLED_BYTE_BUFFER_FACTORY";
@@ -341,10 +343,10 @@ public final class Constants {
     public static final String IDLE_TIMEOUT_TRIGGERED_WHILE_WRITING_100_CONTINUE_RESPONSE
             = "Idle timeout triggered while writing 100 continue response";
 
-    public static final String IDLE_TIMEOUT_TRIGGERED_BEFORE_INITIATING_OUTBOUND_REQUEST
-            = "Idle timeout triggered before initiating outbound request";
     public static final String IDLE_TIMEOUT_TRIGGERED_WHILE_WRITING_OUTBOUND_REQUEST_HEADERS
             = "Idle timeout triggered while writing outbound request headers";
+    public static final String IDLE_TIMEOUT_TRIGGERED_WHILE_SENDING_RST_STREAM
+            = "Idle timeout triggered while sending RST_STREAM frame";
     public static final String IDLE_TIMEOUT_TRIGGERED_WHILE_WRITING_OUTBOUND_REQUEST_BODY
             = "Idle timeout triggered while writing outbound request entity body";
     public static final String IDLE_TIMEOUT_TRIGGERED_BEFORE_INITIATING_INBOUND_RESPONSE
@@ -357,11 +359,6 @@ public final class Constants {
             = "Idle timeout triggered while reading inbound response entity body";
     public static final String IDLE_TIMEOUT_TRIGGERED_WHILE_READING_PUSH_RESPONSE_BODY
             = "Idle timeout triggered while reading push response entity body";
-
-    public static final String EXCEPTION_CAUGHT_WHILE_READING_REQUEST
-            = "Exception caught while reading inbound request";
-    public static final String EXCEPTION_CAUGHT_WHILE_READING_RESPONSE
-            = "Exception caught while reading inbound response";
 
     // Client connection closure error scenarios
     public static final String REMOTE_CLIENT_CLOSED_BEFORE_INITIATING_INBOUND_REQUEST
@@ -380,12 +377,29 @@ public final class Constants {
             = "Remote client closed the connection before initiating 100 continue response";
     public static final String REMOTE_CLIENT_CLOSED_WHILE_WRITING_100_CONTINUE_RESPONSE
             = "Remote client closed the connection while writing 100 continue response";
+    // Client GOAWAY error scenarios
+    public static final String REMOTE_CLIENT_SENT_GOAWAY_WHILE_READING_INBOUND_REQUEST_HEADERS
+            = "Remote client sent GOAWAY while reading inbound request headers";
+    public static final String REMOTE_CLIENT_SENT_GOAWAY_WHILE_READING_INBOUND_REQUEST_BODY
+            = "Remote client sent GOAWAY while reading inbound request entity body";
+    public static final String REMOTE_CLIENT_SENT_GOAWAY_BEFORE_INITIATING_OUTBOUND_RESPONSE
+            = "Remote client sent GOAWAY before initiating outbound response";
+    public static final String REMOTE_CLIENT_SENT_GOAWAY_WHILE_WRITING_OUTBOUND_RESPONSE_HEADERS
+            = "Remote client sent GOAWAY while writing outbound response headers";
+    public static final String REMOTE_CLIENT_SENT_GOAWAY_WHILE_WRITING_OUTBOUND_RESPONSE_BODY
+            = "Remote client sent GOAWAY while writing outbound response entity body";
+    public static final String REMOTE_CLIENT_SENT_GOAWAY_BEFORE_INITIATING_100_CONTINUE_RESPONSE
+            = "Remote client sent GOAWAY before initiating 100 continue response";
+    public static final String REMOTE_CLIENT_SENT_GOAWAY_WHILE_WRITING_100_CONTINUE_RESPONSE
+            = "Remote client sent GOAWAY while writing 100 continue response";
 
     // Server connection closure error scenarios
     public static final String REMOTE_SERVER_CLOSED_BEFORE_INITIATING_OUTBOUND_REQUEST
             = "Remote host closed the connection before initiating outbound request";
     public static final String REMOTE_SERVER_CLOSED_WHILE_WRITING_OUTBOUND_REQUEST_HEADERS
             = "Remote host closed the connection while writing outbound request headers";
+    public static final String REMOTE_SERVER_CLOSED_WHILE_SENDING_RST_STREAM
+            = "Remote host closed the connection while sending RST_STREAM frame";
     public static final String REMOTE_SERVER_CLOSED_WHILE_WRITING_OUTBOUND_REQUEST_BODY
             = "Remote host closed the connection while writing outbound request entity body";
     public static final String REMOTE_SERVER_CLOSED_BEFORE_INITIATING_INBOUND_RESPONSE
@@ -396,6 +410,32 @@ public final class Constants {
             = "Remote host closed the connection while reading inbound response body";
     public static final String REMOTE_SERVER_CLOSED_BEFORE_READING_100_CONTINUE_RESPONSE
             = "Remote host closed the connection before reading 100 continue response";
+    // Server GOAWAY error scenarios
+    public static final String REMOTE_SERVER_SENT_GOAWAY_WHILE_WRITING_OUTBOUND_REQUEST_HEADERS
+            = "Remote host sent GOAWAY while writing outbound request headers";
+    public static final String REMOTE_SERVER_SENT_GOAWAY_WHILE_SENDING_RST_STREAM
+            = "Remote host sent GOAWAY while sending RST_STREAM frame";
+    public static final String REMOTE_SERVER_SENT_GOAWAY_WHILE_WRITING_OUTBOUND_REQUEST_BODY
+            = "Remote host sent GOAWAY while writing outbound request entity body";
+    public static final String REMOTE_SERVER_SENT_GOAWAY_BEFORE_INITIATING_INBOUND_RESPONSE
+            = "Remote host sent GOAWAY before initiating inbound response";
+    public static final String REMOTE_SERVER_SENT_GOAWAY_WHILE_READING_INBOUND_RESPONSE_HEADERS
+            = "Remote host sent GOAWAY while reading inbound response headers";
+    public static final String REMOTE_SERVER_SENT_GOAWAY_WHILE_READING_INBOUND_RESPONSE_BODY
+            = "Remote host sent GOAWAY while reading inbound response body";
+    // Server send RST_STREAM error scenarios
+    public static final String REMOTE_SERVER_SENT_RST_STREAM_WHILE_WRITING_OUTBOUND_REQUEST_HEADERS
+            = "Remote host sent RST_STREAM while writing outbound request headers";
+    public static final String REMOTE_SERVER_SENT_RST_STREAM_WHILE_SENDING_RST_STREAM
+            = "Remote host sent RST_STREAM while sending RST_STREAM frame";
+    public static final String REMOTE_SERVER_SENT_RST_STREAM_WHILE_WRITING_OUTBOUND_REQUEST_BODY
+            = "Remote host sent RST_STREAM while writing outbound request entity body";
+    public static final String REMOTE_SERVER_SENT_RST_STREAM_BEFORE_INITIATING_INBOUND_RESPONSE
+            = "Remote host sent RST_STREAM before initiating inbound response";
+    public static final String REMOTE_SERVER_SENT_RST_STREAM_WHILE_READING_INBOUND_RESPONSE_HEADERS
+            = "Remote host sent RST_STREAM while reading inbound response headers";
+    public static final String REMOTE_SERVER_SENT_RST_STREAM_WHILE_READING_INBOUND_RESPONSE_BODY
+            = "Remote host sent RST_STREAM while reading inbound response body";
 
     public static final String REMOTE_CLIENT_TO_HOST_CONNECTION_CLOSED
             = "Connection between remote client and host is closed";

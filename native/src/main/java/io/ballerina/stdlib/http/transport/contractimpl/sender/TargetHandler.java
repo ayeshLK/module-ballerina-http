@@ -66,6 +66,7 @@ public class TargetHandler extends ChannelInboundHandlerAdapter {
     private boolean idleTimeoutTriggered;
     private ChannelHandlerContext context;
     private Throwable cause;
+    private HttpClientChannelInitializer httpClientChannelInitializer;
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
@@ -120,6 +121,7 @@ public class TargetHandler extends ChannelInboundHandlerAdapter {
         if (!idleTimeoutTriggered) {
             targetChannel.senderReqRespStateManager.handleAbruptChannelClosure(this, httpResponseFuture);
         }
+        releasePerRoutePoolLatchOnFailure();
         connectionManager.invalidateTargetChannel(targetChannel);
 
         if (handlerExecutor != null) {
@@ -286,5 +288,13 @@ public class TargetHandler extends ChannelInboundHandlerAdapter {
 
     public Throwable getCause() {
         return cause;
+    }
+
+    public HttpClientChannelInitializer getHttpClientChannelInitializer() {
+        return httpClientChannelInitializer;
+    }
+
+    public void setHttpClientChannelInitializer(HttpClientChannelInitializer httpClientChannelInitializer) {
+        this.httpClientChannelInitializer = httpClientChannelInitializer;
     }
 }

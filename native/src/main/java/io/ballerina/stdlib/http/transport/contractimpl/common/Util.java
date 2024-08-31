@@ -15,6 +15,7 @@
 
 package io.ballerina.stdlib.http.transport.contractimpl.common;
 
+import io.ballerina.stdlib.http.api.HttpUtil;
 import io.ballerina.stdlib.http.transport.contract.Constants;
 import io.ballerina.stdlib.http.transport.contract.HttpResponseFuture;
 import io.ballerina.stdlib.http.transport.contract.config.ChunkConfig;
@@ -98,6 +99,7 @@ import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
@@ -123,6 +125,7 @@ import static io.ballerina.stdlib.http.transport.contract.Constants.MUTUAL_SSL_F
 import static io.ballerina.stdlib.http.transport.contract.Constants.MUTUAL_SSL_HANDSHAKE_RESULT;
 import static io.ballerina.stdlib.http.transport.contract.Constants.MUTUAL_SSL_PASSED;
 import static io.ballerina.stdlib.http.transport.contract.Constants.OK_200;
+import static io.ballerina.stdlib.http.transport.contract.Constants.OUTBOUND_ACCESS_LOG_MESSAGES;
 import static io.ballerina.stdlib.http.transport.contract.Constants.PROTOCOL;
 import static io.ballerina.stdlib.http.transport.contract.Constants.REMOTE_CLIENT_CLOSED_WHILE_WRITING_OUTBOUND_RESPONSE_HEADERS;
 import static io.ballerina.stdlib.http.transport.contract.Constants.TO;
@@ -194,6 +197,9 @@ public class Util {
         if (!keepAlive && (Float.valueOf(inboundReqHttpVersion) >= Constants.HTTP_1_1)) {
             outboundResponseMsg.setHeader(HttpHeaderNames.CONNECTION.toString(), Constants.CONNECTION_CLOSE);
         } else if (keepAlive && (Float.valueOf(inboundReqHttpVersion) < Constants.HTTP_1_1)) {
+            outboundResponseMsg.setHeader(HttpHeaderNames.CONNECTION.toString(), Constants.CONNECTION_KEEP_ALIVE);
+        } else if (Float.valueOf(inboundReqHttpVersion) == Constants.HTTP_1_1
+                && HttpUtil.hasEventStreamContentType(outboundResponseMsg)) {
             outboundResponseMsg.setHeader(HttpHeaderNames.CONNECTION.toString(), Constants.CONNECTION_KEEP_ALIVE);
         } else {
             outboundResponseMsg.removeHeader(HttpHeaderNames.CONNECTION.toString());
@@ -867,6 +873,7 @@ public class Util {
                 ctx.channel().attr(Constants.MUTUAL_SSL_RESULT_ATTRIBUTE).get());
         inboundRequestMsg.setProperty(BASE_64_ENCODED_CERT,
                 ctx.channel().attr(Constants.BASE_64_ENCODED_CERT_ATTRIBUTE).get());
+        inboundRequestMsg.setProperty(OUTBOUND_ACCESS_LOG_MESSAGES, new ArrayList<>());
 
         return inboundRequestMsg;
     }

@@ -36,7 +36,6 @@ import io.ballerina.stdlib.http.transport.contractimpl.sender.states.http2.Reque
 import io.ballerina.stdlib.http.transport.message.Http2DataFrame;
 import io.ballerina.stdlib.http.transport.message.Http2InboundContentListener;
 import io.ballerina.stdlib.http.transport.message.Http2PushPromise;
-import io.ballerina.stdlib.http.transport.message.Http2Reset;
 import io.ballerina.stdlib.http.transport.message.HttpCarbonMessage;
 import io.ballerina.stdlib.http.transport.message.HttpCarbonRequest;
 import io.ballerina.stdlib.http.transport.message.PooledDataStreamerFactory;
@@ -44,6 +43,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -63,6 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 
 import static io.ballerina.stdlib.http.transport.contract.Constants.BASE_64_ENCODED_CERT;
 import static io.ballerina.stdlib.http.transport.contract.Constants.CHNL_HNDLR_CTX;
@@ -74,6 +75,7 @@ import static io.ballerina.stdlib.http.transport.contract.Constants.LISTENER_INT
 import static io.ballerina.stdlib.http.transport.contract.Constants.LISTENER_PORT;
 import static io.ballerina.stdlib.http.transport.contract.Constants.LOCAL_ADDRESS;
 import static io.ballerina.stdlib.http.transport.contract.Constants.MUTUAL_SSL_HANDSHAKE_RESULT;
+import static io.ballerina.stdlib.http.transport.contract.Constants.OUTBOUND_ACCESS_LOG_MESSAGES;
 import static io.ballerina.stdlib.http.transport.contract.Constants.POOLED_BYTE_BUFFER_FACTORY;
 import static io.ballerina.stdlib.http.transport.contract.Constants.PROMISED_STREAM_REJECTED_ERROR;
 import static io.ballerina.stdlib.http.transport.contract.Constants.PROTOCOL;
@@ -158,6 +160,7 @@ public final class Http2StateUtil {
         String uri = httpRequest.uri();
         sourceReqCMsg.setRequestUrl(uri);
         sourceReqCMsg.setProperty(TO, uri);
+        sourceReqCMsg.setProperty(OUTBOUND_ACCESS_LOG_MESSAGES, new ArrayList<>());
         return sourceReqCMsg;
     }
 
@@ -282,7 +285,7 @@ public final class Http2StateUtil {
     }
 
     /**
-     * Sends {@link Http2Reset} frame with `NO_ERROR` error code.
+     * Sends `RST_STREAM` frame with `NO_ERROR` error code.
      *
      * @param ctx      the channel handler context
      * @param encoder  the HTTP2 connection encoder
@@ -321,9 +324,13 @@ public final class Http2StateUtil {
                 return;
             }
         }
-
-        encoder.writeHeaders(ctx, streamId, http2Headers, dependencyId, weight, false, 0, endStream,
-                             ctx.newPromise());
+        ChannelPromise promise = ctx.newPromise();
+        encoder.writeHeaders(ctx, streamId, http2Headers, dependencyId, weight, false, 0, endStream, promise);
+        promise.addListener((ChannelFutureListener) channelFuture -> {
+            if (!channelFuture.isSuccess()) {
+                outboundMsgHolder.getResponseFuture().notifyHttpListener(channelFuture.cause());
+            }
+        });
         encoder.flowController().writePendingBytes();
         ctx.flush();
 
@@ -371,7 +378,11 @@ public final class Http2StateUtil {
      * @throws Http2Exception if a protocol-related error occurred
      */
     private static void createStream(Http2Connection conn, int streamId) throws Http2Exception {
-        conn.local().createStream(streamId, false);
+        try {
+            conn.local().createStream(streamId, false);
+        } catch (Http2Exception.StreamException exception) {
+            throw new Http2Exception(exception.error(), "Error occurred while creating stream", exception);
+        }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Stream created streamId: {}", streamId);
         }

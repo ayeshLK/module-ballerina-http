@@ -7,7 +7,7 @@ keywords = ["http", "network", "service", "listener", "client"]
 repository = "https://github.com/ballerina-platform/module-ballerina-http"
 icon = "icon.png"
 license = ["Apache-2.0"]
-distribution = "2201.8.0"
+distribution = "2201.10.0"
 export = ["http", "http.httpscerr"]
 
 [platform.java17]
@@ -102,6 +102,12 @@ groupId = "org.bouncycastle"
 artifactId = "bcprov-jdk18on"
 version = "@bouncycastle.version@"
 path = "./lib/bcprov-jdk18on-@bouncycastle.version@.jar"
+
+[[platform.java17.dependency]]
+groupId = "org.bouncycastle"
+artifactId = "bcutil-jdk18on"
+version = "@bouncycastle.version@"
+path = "./lib/bcutil-jdk18on-@bouncycastle.version@.jar"
 
 [[platform.java17.dependency]]
 groupId = "org.bouncycastle"

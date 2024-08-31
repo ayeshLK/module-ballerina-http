@@ -79,6 +79,7 @@ public class HttpCarbonMessage {
     private String httpMethod;
     private String requestUrl;
     private Integer httpStatusCode;
+    private Integer contentSize = 0;
     private boolean contentReleased = false;
 
     public HttpCarbonMessage(HttpMessage httpMessage, Listener contentListener) {
@@ -144,6 +145,9 @@ public class HttpCarbonMessage {
     public HttpContent getHttpContent() {
         HttpContent httpContent = this.blockingEntityCollector.getHttpContent();
         this.contentObservable.notifyGetListener(httpContent);
+        if (httpContent != null) {
+            this.contentSize += httpContent.content().readableBytes();
+        }
         return httpContent;
     }
 
@@ -547,6 +551,10 @@ public class HttpCarbonMessage {
         return pipeliningEnabled;
     }
 
+    public Integer getContentSize() {
+        return contentSize;
+    }
+
     public void setContentReleased(boolean contentReleased) {
         this.contentReleased = contentReleased;
     }
@@ -673,6 +681,11 @@ public class HttpCarbonMessage {
 
     public boolean isInterceptorError() {
         return this.getProperty(HttpConstants.INTERCEPTOR_SERVICE_ERROR) != null;
+    }
+
+    public boolean isInterceptorInternalError() {
+        return this.getProperty(HttpConstants.INTERNAL_ERROR) != null &&
+                this.getProperty(HttpConstants.INTERCEPTOR_SERVICE_ERROR) != null;
     }
 
     public String getRequestInterceptorServiceState() {

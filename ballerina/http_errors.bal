@@ -27,6 +27,14 @@ public type Detail record {
     anydata body;
 };
 
+# Represents the details of an HTTP status code binding client error.
+#
+# + fromDefaultStatusCodeMapping - Indicates whether the error orginates from default status code response mapping
+public type StatusCodeBindingErrorDetail record {
+    *Detail;
+    boolean fromDefaultStatusCodeMapping;
+};
+
 # Represents the details of the `LoadBalanceActionError`.
 #
 # + httpActionErr - Array of errors occurred at each endpoint
@@ -38,6 +46,8 @@ public type LoadBalanceActionErrorData record {
 # Defines the common error type for the module.
 public type Error distinct error;
 
+type InternalError distinct Error;
+
 // Level 2
 # Defines the possible listener error types.
 public type ListenerError distinct Error;
@@ -48,8 +58,14 @@ public type ClientError distinct Error;
 # Represents a header not found error when retrieving headers.
 public type HeaderNotFoundError distinct Error;
 
+# Represents an error, which occurred due to header binding.
+public type HeaderBindingError distinct Error;
+
 # Represents an error, which occurred due to payload binding.
 public type PayloadBindingError distinct Error;
+
+# Represents an error, which occurred due to media-type binding.
+public type MediaTypeBindingError distinct Error;
 
 // Level 3
 # Defines the listener error types that returned while receiving inbound request.
@@ -64,41 +80,61 @@ public type GenericListenerError distinct ListenerError;
 # Represents an error, which occurred due to a failure in interceptor return.
 public type InterceptorReturnError distinct ListenerError & httpscerr:InternalServerErrorError;
 
-# Represents an error, which occurred due to a header binding.
-public type HeaderBindingError distinct ListenerError & httpscerr:BadRequestError;
+type InternalInterceptorReturnError InterceptorReturnError & InternalError;
 
-// TODO: Change the error type as HeaderBindingError once this issue is fixed:
-// https://github.com/ballerina-platform/ballerina-lang/issues/40273
+type HeaderNotFoundClientError ClientError & HeaderNotFoundError;
+
+type HeaderBindingClientError ClientError & HeaderBindingError;
+
+type InternalHeaderBindingListenerError ListenerError & HeaderBindingError & httpscerr:BadRequestError & InternalError;
+
 # Represents an error, which occurred due to a header constraint validation.
-public type HeaderValidationError distinct HeaderBindingError & httpscerr:BadRequestError;
+public type HeaderValidationError distinct HeaderBindingError;
+
+type HeaderValidationClientError ClientError & HeaderValidationError;
+
+type InternalHeaderValidationListenerError ListenerError & HeaderValidationError & httpscerr:BadRequestError & InternalError;
 
 # Represents an error, which occurred due to the absence of the payload.
 public type NoContentError distinct ClientError;
 
 type PayloadBindingClientError ClientError & PayloadBindingError;
 
-type PayloadBindingListenerError distinct ListenerError & PayloadBindingError & httpscerr:BadRequestError;
+type InternalPayloadBindingListenerError distinct ListenerError & PayloadBindingError & httpscerr:BadRequestError & InternalError;
 
 # Represents an error, which occurred due to payload constraint validation.
 public type PayloadValidationError distinct PayloadBindingError;
 
 type PayloadValidationClientError ClientError & PayloadValidationError;
 
-type PayloadValidationListenerError distinct ListenerError & PayloadValidationError & httpscerr:BadRequestError;
+type InternalPayloadValidationListenerError distinct ListenerError & PayloadValidationError & httpscerr:BadRequestError & InternalError;
 
 # Represents an error, which occurred due to a query parameter binding.
 public type QueryParameterBindingError distinct ListenerError & httpscerr:BadRequestError;
 
-// TODO: Change the error type as QueryParameterBindingError once this issue is fixed:
-// https://github.com/ballerina-platform/ballerina-lang/issues/40273
+type InternalQueryParameterBindingError QueryParameterBindingError & InternalError;
+
 # Represents an error, which occurred due to a query parameter constraint validation.
-public type QueryParameterValidationError distinct QueryParameterBindingError & httpscerr:BadRequestError;
+public type QueryParameterValidationError distinct QueryParameterBindingError;
+
+type InternalQueryParameterValidationError QueryParameterValidationError & InternalError;
 
 # Represents an error, which occurred due to a path parameter binding.
 public type PathParameterBindingError distinct ListenerError & httpscerr:BadRequestError;
 
+type InternalPathParameterBindingError PathParameterBindingError & InternalError;
+
+type MediaTypeBindingClientError ClientError & MediaTypeBindingError;
+
+# Represents an error, which occurred due to media type validation.
+public type MediaTypeValidationError distinct MediaTypeBindingError;
+
+type MediaTypeValidationClientError ClientError & MediaTypeValidationError;
+
 # Represents an error, which occurred during the request dispatching.
 public type RequestDispatchingError distinct ListenerError;
+
+type InternalRequestDispatchingError RequestDispatchingError & InternalError;
 
 # Represents an error, which occurred during the service dispatching.
 public type ServiceDispatchingError distinct RequestDispatchingError;
@@ -242,23 +278,63 @@ public type InvalidCookieError distinct OutboundResponseError;
 # Represents Service Not Found error.
 public type ServiceNotFoundError httpscerr:NotFoundError & ServiceDispatchingError;
 
+type InternalServiceNotFoundError ServiceNotFoundError & InternalError;
+
 # Represents Bad Matrix Parameter in the request error.
 public type BadMatrixParamError httpscerr:BadRequestError & ServiceDispatchingError;
+
+type InternalBadMatrixParamError BadMatrixParamError & InternalError;
 
 # Represents an error, which occurred when the resource is not found during dispatching.
 public type ResourceNotFoundError httpscerr:NotFoundError & ResourceDispatchingError;
 
+type InternalResourceNotFoundError ResourceNotFoundError & InternalError;
+
 # Represents an error, which occurred due to a path parameter constraint validation.
 public type ResourcePathValidationError httpscerr:BadRequestError & ResourceDispatchingError;
+
+type InternalResourcePathValidationError ResourcePathValidationError & InternalError;
 
 # Represents an error, which occurred when the resource method is not allowed during dispatching.
 public type ResourceMethodNotAllowedError httpscerr:MethodNotAllowedError & ResourceDispatchingError;
 
+type InternalResourceMethodNotAllowedError ResourceMethodNotAllowedError & InternalError;
+
 # Represents an error, which occurred when the media type is not supported during dispatching.
 public type UnsupportedRequestMediaTypeError httpscerr:UnsupportedMediaTypeError & ResourceDispatchingError;
+
+type InternalUnsupportedRequestMediaTypeError UnsupportedRequestMediaTypeError & InternalError;
 
 # Represents an error, which occurred when the payload is not acceptable during dispatching.
 public type RequestNotAcceptableError httpscerr:NotAcceptableError & ResourceDispatchingError;
 
+type InternalRequestNotAcceptableError RequestNotAcceptableError & InternalError;
+
 # Represents other internal server errors during dispatching.
 public type ResourceDispatchingServerError httpscerr:InternalServerErrorError & ResourceDispatchingError;
+
+type InternalResourceDispatchingServerError ResourceDispatchingServerError & InternalError;
+
+# Represents the client status code binding error
+public type StatusCodeResponseBindingError distinct ClientError & error<StatusCodeBindingErrorDetail>;
+
+# Represents the status code binding error that occurred due to 4XX status code response binding
+public type StatusCodeBindingClientRequestError distinct StatusCodeResponseBindingError & ClientRequestError;
+
+# Represents the status code binding error that occurred due to 5XX status code response binding
+public type StatusCodeBindingRemoteServerError distinct StatusCodeResponseBindingError & RemoteServerError;
+
+type MediaTypeBindingStatusCodeClientError distinct MediaTypeBindingClientError & StatusCodeResponseBindingError;
+
+type MediaTypeValidationStatusCodeClientError distinct MediaTypeValidationClientError & StatusCodeResponseBindingError;
+
+type PayloadBindingStatusCodeClientError distinct PayloadBindingClientError & StatusCodeResponseBindingError;
+
+type PayloadValidationStatusCodeClientError distinct PayloadValidationClientError & StatusCodeResponseBindingError;
+
+type HeaderBindingStatusCodeClientError distinct HeaderBindingClientError & StatusCodeResponseBindingError;
+
+type HeaderValidationStatusCodeClientError distinct HeaderValidationClientError & StatusCodeResponseBindingError;
+
+# Represents the client status code response data binding error
+public type StatusCodeResponseDataBindingError MediaTypeBindingStatusCodeClientError|PayloadBindingStatusCodeClientError|HeaderBindingStatusCodeClientError;

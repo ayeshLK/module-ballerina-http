@@ -19,6 +19,7 @@
 package io.ballerina.stdlib.http.api.client.endpoint;
 
 import io.ballerina.runtime.api.values.BDecimal;
+import io.ballerina.runtime.api.values.BError;
 import io.ballerina.runtime.api.values.BMap;
 import io.ballerina.runtime.api.values.BObject;
 import io.ballerina.runtime.api.values.BString;
@@ -93,6 +94,9 @@ public class CreateSimpleHttpClient {
             if (connectionManager.isHTTPTraceLoggerEnabled()) {
                 senderConfiguration.setHttpTraceLogEnabled(true);
             }
+            if (connectionManager.isHTTPAccessLoggerEnabled()) {
+                senderConfiguration.setHttpAccessLogEnabled(true);
+            }
             senderConfiguration.setTLSStoreType(HttpConstants.PKCS_STORE_TYPE);
 
             String httpVersion = clientEndpointConfig.getStringValue(HttpConstants.CLIENT_EP_HTTP_VERSION).getValue();
@@ -153,7 +157,8 @@ public class CreateSimpleHttpClient {
             httpClient.addNativeData(HttpConstants.CLIENT_ENDPOINT_CONFIG, clientEndpointConfig);
             return null;
         } catch (Exception ex) {
-            return HttpUtil.createHttpError(ex.getMessage(), HttpErrorType.GENERIC_CLIENT_ERROR);
+            return ex instanceof BError ? ex :
+                    HttpUtil.createHttpError(ex.getMessage(), HttpErrorType.GENERIC_CLIENT_ERROR);
         }
     }
 

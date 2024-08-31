@@ -5,10 +5,90 @@ This file contains all the notable changes done to the Ballerina HTTP package th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to 
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] - 2024-08-20
+
+### Added
+- [Add support for Server-Sent Events](https://github.com/ballerina-platform/ballerina-library/issues/6687)
+- [Introduce default status code response record](https://github.com/ballerina-platform/ballerina-library/issues/6491)
+- [Add connection eviction feature to handle connections that receive GO_AWAY from the client](https://github.com/ballerina-platform/ballerina-library/issues/6734)
+- [Enhance the configurability of Ballerina access logging by introducing multiple configuration options.](https://github.com/ballerina-platform/ballerina-library/issues/6111)
+- [Introduce HTTP service contract object type](https://github.com/ballerina-platform/ballerina-library/issues/6378)
+
+### Fixed
+
+- [Fix number format exception with decimal values for cache configuration](https://github.com/ballerina-platform/ballerina-library/issues/6765)
+- [Fix cookie path resolution logic](https://github.com/ballerina-platform/ballerina-library/issues/6788)
+
+## [2.11.2] - 2024-06-14
+
+### Added
+
+- [Generate and host SwaggerUI for the generated OpenAPI specification as a built-in resource](https://github.com/ballerina-platform/ballerina-library/issues/6622)
+
+### Fixed
+
+- [Remove the resource level annotation restrictions](https://github.com/ballerina-platform/ballerina-library/issues/5831)
+
+## [2.11.1] - 2024-05-29
+
+### Fixed
+
+- [Fix caching behaviour with client execute method](https://github.com/ballerina-platform/ballerina-library/issues/6570)
+
+## [2.11.0] - 2024-05-03
+
+### Added
+
+- [Add status code response binding support for the HTTP client](https://github.com/ballerina-platform/ballerina-library/issues/6100)
+- [Add response binding support for types union with `http:Response`](https://github.com/ballerina-platform/ballerina-library/issues/6416)
+- [Supporting X25519Kyber768 key encapsulation for TLS 1.3](https://github.com/ballerina-platform/ballerina-library/issues/6200)
+
+### Fixed
+
+- [Address CVE-2024-29025 netty's vulnerability](https://github.com/ballerina-platform/ballerina-library/issues/6242)
+- [Fix interceptor pipeline getting exited when there is a `nil` return](https://github.com/ballerina-platform/ballerina-library/issues/6278)
+- [Fix response binding error for `anydata` type](https://github.com/ballerina-platform/ballerina-library/issues/6414)
+
+## [2.10.12] - 2024-03-21
+
+### Fixed
+
+- [Fix the inconsistency in overwriting identical cookies](https://github.com/ballerina-platform/ballerina-library/issues/6194)
+
+## [2.10.11] - 2024-03-13
+
+### Changed
+
+- [Update Host header only when a value is intentionally provided](https://github.com/ballerina-platform/ballerina-library/issues/6149)
+
+## [2.10.8] - 2024-03-05
+
+### Added
+
+- [Make the `Host` header overridable](https://github.com/ballerina-platform/ballerina-library/issues/6133)
+
+## [2.10.7] - 2024-02-14
+
+### Fixed
+- [Fix connection getting closed by stale eviction task after it has been closed by the server](https://github.com/ballerina-platform/ballerina-library/issues/6050)
+
+## [2.10.6] - 2024-02-01
+
+### Added
+- [Expose HTTP connection eviction configurations in the client level](https://github.com/ballerina-platform/ballerina-library/issues/5951)
+- [Handle GO_AWAY received HTTP/2 clients gracefully](https://github.com/ballerina-platform/ballerina-library/issues/4806)
+
+### Fixed
+- [Remove unused import from Http2StateUtil](https://github.com/ballerina-platform/ballerina-library/issues/5966)
+- [Fix client getting hanged when server closes connection in the ALPN handshake](https://github.com/ballerina-platform/ballerina-library/issues/6003)
+- [Fix client getting hanged when multiple requests are sent which exceed `maxHeaderSize`](https://github.com/ballerina-platform/ballerina-library/issues/6000)
+- [Fix inconsistencies with error logging](https://github.com/ballerina-platform/ballerina-library/issues/5877)
+
 ## [2.10.5] - 2023-12-06
 
 ### Fixed
 - [Fix `IndexOutOfBoundsException` when decoding jwt header](https://github.com/ballerina-platform/ballerina-library/issues/5856)
+- [Fix HTTP/2 upgrade client hanging when server closes the connection abruptly](https://github.com/ballerina-platform/ballerina-library/issues/5955)
 
 ## [2.10.4] - 2023-11-17
 

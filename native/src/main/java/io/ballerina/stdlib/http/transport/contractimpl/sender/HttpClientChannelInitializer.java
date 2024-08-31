@@ -60,6 +60,8 @@ import io.netty.handler.ssl.SslHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.channels.ClosedChannelException;
+
 import javax.net.ssl.SSLEngine;
 
 import static io.ballerina.stdlib.http.transport.contract.Constants.MAX_ENTITY_BODY_VALIDATION_HANDLER;
@@ -76,6 +78,7 @@ public class HttpClientChannelInitializer extends ChannelInitializer<SocketChann
 
     private TargetHandler targetHandler;
     private boolean httpTraceLogEnabled;
+    private boolean httpAccessLogEnabled;
     private KeepAliveConfig keepAliveConfig;
     private ProxyServerConfiguration proxyServerConfiguration;
     private Http2ConnectionManager http2ConnectionManager;
@@ -96,6 +99,7 @@ public class HttpClientChannelInitializer extends ChannelInitializer<SocketChann
                                         ConnectionManager connectionManager,
                                         ConnectionAvailabilityFuture connectionAvailabilityFuture) {
         this.httpTraceLogEnabled = senderConfiguration.isHttpTraceLogEnabled();
+        this.httpAccessLogEnabled = senderConfiguration.isHttpAccessLogEnabled();
         this.keepAliveConfig = senderConfiguration.getKeepAliveConfig();
         this.proxyServerConfiguration = senderConfiguration.getProxyServerConfiguration();
         this.http2ConnectionManager = connectionManager.getHttp2ConnectionManager();
@@ -134,6 +138,8 @@ public class HttpClientChannelInitializer extends ChannelInitializer<SocketChann
         targetHandler = new TargetHandler();
         targetHandler.setHttp2TargetHandler(http2TargetHandler);
         targetHandler.setKeepAliveConfig(getKeepAliveConfig());
+        targetHandler.setHttpClientChannelInitializer(this);
+        http2TargetHandler.setHttpClientChannelInitializer(this);
         if (http2) {
             if (sslConfig != null) {
                 configureSslForHttp2(socketChannel, clientPipeline, sslConfig);
@@ -219,9 +225,14 @@ public class HttpClientChannelInitializer extends ChannelInitializer<SocketChann
                                 sslConfig.getCacheSize()));
             }
         }
-        clientPipeline.addLast(new Http2PipelineConfiguratorForClient(targetHandler, connectionAvailabilityFuture));
+        clientPipeline.addLast(
+                new ALPNClientHandler(targetHandler, connectionAvailabilityFuture));
         clientPipeline
                 .addLast(Constants.HTTP2_EXCEPTION_HANDLER, new Http2ExceptionHandler(http2ConnectionHandler));
+    }
+
+    public boolean isHttpAccessLogEnabled() {
+        return httpAccessLogEnabled;
     }
 
     public TargetHandler getTargetHandler() {
@@ -329,16 +340,22 @@ public class HttpClientChannelInitializer extends ChannelInitializer<SocketChann
     /**
      * A handler to create the pipeline based on the ALPN negotiated protocol.
      */
-    class Http2PipelineConfiguratorForClient extends ApplicationProtocolNegotiationHandler {
+    class ALPNClientHandler extends ApplicationProtocolNegotiationHandler {
 
         private TargetHandler targetHandler;
         private ConnectionAvailabilityFuture connectionAvailabilityFuture;
 
-        public Http2PipelineConfiguratorForClient(TargetHandler targetHandler,
-                ConnectionAvailabilityFuture connectionAvailabilityFuture) {
+        public ALPNClientHandler(TargetHandler targetHandler,
+                                 ConnectionAvailabilityFuture connectionAvailabilityFuture) {
             super(ApplicationProtocolNames.HTTP_1_1);
             this.targetHandler = targetHandler;
             this.connectionAvailabilityFuture = connectionAvailabilityFuture;
+        }
+
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            connectionAvailabilityFuture.notifyFailure(new ClosedChannelException());
+            ctx.close();
         }
 
         /**

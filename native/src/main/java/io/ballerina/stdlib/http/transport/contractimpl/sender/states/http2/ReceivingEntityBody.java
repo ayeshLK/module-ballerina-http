@@ -18,6 +18,7 @@
 
 package io.ballerina.stdlib.http.transport.contractimpl.sender.states.http2;
 
+import io.ballerina.stdlib.http.api.logging.accesslog.SenderHttpAccessLogger;
 import io.ballerina.stdlib.http.transport.contractimpl.common.states.Http2MessageStateContext;
 import io.ballerina.stdlib.http.transport.contractimpl.sender.http2.Http2ClientChannel;
 import io.ballerina.stdlib.http.transport.contractimpl.sender.http2.Http2TargetHandler;
@@ -36,6 +37,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static io.ballerina.stdlib.http.transport.contract.Constants.REMOTE_SERVER_CLOSED_WHILE_READING_INBOUND_RESPONSE_BODY;
+import static io.ballerina.stdlib.http.transport.contract.Constants.REMOTE_SERVER_SENT_GOAWAY_WHILE_READING_INBOUND_RESPONSE_BODY;
+import static io.ballerina.stdlib.http.transport.contract.Constants.REMOTE_SERVER_SENT_RST_STREAM_WHILE_READING_INBOUND_RESPONSE_BODY;
 import static io.ballerina.stdlib.http.transport.contractimpl.common.states.Http2StateUtil.releaseContent;
 import static io.ballerina.stdlib.http.transport.contractimpl.common.states.StateUtil.handleIncompleteInboundMessage;
 
@@ -51,12 +54,17 @@ public class ReceivingEntityBody implements SenderState {
     private final Http2TargetHandler http2TargetHandler;
     private final Http2ClientChannel http2ClientChannel;
     private final Http2TargetHandler.Http2RequestWriter http2RequestWriter;
+    private SenderHttpAccessLogger accessLogger;
 
     ReceivingEntityBody(Http2TargetHandler http2TargetHandler,
                         Http2TargetHandler.Http2RequestWriter http2RequestWriter) {
         this.http2TargetHandler = http2TargetHandler;
         this.http2RequestWriter = http2RequestWriter;
         this.http2ClientChannel = http2TargetHandler.getHttp2ClientChannel();
+        if (http2TargetHandler.getHttpClientChannelInitializer().isHttpAccessLogEnabled()) {
+            accessLogger =
+                    new SenderHttpAccessLogger(http2TargetHandler.getHttp2ClientChannel().getChannel().remoteAddress());
+        }
     }
 
     @Override
@@ -117,10 +125,25 @@ public class ReceivingEntityBody implements SenderState {
                                        REMOTE_SERVER_CLOSED_WHILE_READING_INBOUND_RESPONSE_BODY);
     }
 
+    @Override
+    public void handleServerGoAway(OutboundMsgHolder outboundMsgHolder) {
+        handleIncompleteInboundMessage(outboundMsgHolder.getResponse(),
+                REMOTE_SERVER_SENT_GOAWAY_WHILE_READING_INBOUND_RESPONSE_BODY);
+    }
+
+    @Override
+    public void handleRstStream(OutboundMsgHolder outboundMsgHolder) {
+        handleIncompleteInboundMessage(outboundMsgHolder.getResponse(),
+                REMOTE_SERVER_SENT_RST_STREAM_WHILE_READING_INBOUND_RESPONSE_BODY);
+    }
+
     private void onDataRead(Http2DataFrame http2DataFrame, OutboundMsgHolder outboundMsgHolder, boolean serverPush,
                             Http2MessageStateContext http2MessageStateContext) {
         int streamId = http2DataFrame.getStreamId();
         ByteBuf data = http2DataFrame.getData();
+        if (accessLogger != null) {
+            accessLogger.updateContentLength(data);
+        }
         boolean endOfStream = http2DataFrame.isEndOfStream();
 
         if (serverPush) {
@@ -129,6 +152,9 @@ public class ReceivingEntityBody implements SenderState {
             onResponseDataRead(outboundMsgHolder, streamId, endOfStream, data);
         }
         if (endOfStream) {
+            if (accessLogger != null) {
+                accessLogger.updateAccessLogInfo(outboundMsgHolder.getRequest(), outboundMsgHolder.getResponse());
+            }
             http2MessageStateContext.setSenderState(new EntityBodyReceived(http2TargetHandler, http2RequestWriter));
         }
     }

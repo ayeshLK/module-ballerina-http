@@ -125,6 +125,7 @@ public final class HttpConstants {
     public static final BString ANN_CONFIG_ATTR_COMPRESSION = StringUtils.fromString("compression");
     public static final BString ANN_CONFIG_ATTR_COMPRESSION_ENABLE = StringUtils.fromString("enable");
     public static final BString ANN_CONFIG_ATTR_COMPRESSION_CONTENT_TYPES = StringUtils.fromString("contentTypes");
+    public static final BString ANN_CONFIG_BASE_PATH = StringUtils.fromString("basePath");
     public static final String ANN_CONFIG_ATTR_CACHE_SIZE = "cacheSize";
     public static final String ANN_CONFIG_ATTR_CACHE_VALIDITY_PERIOD = "cacheValidityPeriod";
     public static final String ANN_CONFIG_ATTR_WEBSOCKET = "webSocket";
@@ -238,6 +239,7 @@ public final class HttpConstants {
     public static final int NO_CONTENT_LENGTH_FOUND = -1;
     public static final short ONE_BYTE = 1;
     public static final String HTTP_HEADERS = "http_headers";
+    public static final String SET_HOST_HEADER = "set_host_header";
     public static final String HTTP_TRAILER_HEADERS = "http_trailer_headers";
     public static final String LEADING_HEADER = "leading";
     public static final BString HEADER_REQUEST_FIELD = StringUtils.fromString("request");
@@ -257,8 +259,6 @@ public final class HttpConstants {
     public static final String HTTP_ERROR_RECORD = "HTTPError";
     public static final BString HTTP_ERROR_MESSAGE = StringUtils.fromString("message");
     public static final BString HTTP_ERROR_STATUS_CODE = StringUtils.fromString("statusCode");
-    public static final String HTTP_CLIENT_REQUEST_ERROR = "ClientRequestError";
-    public static final String HTTP_REMOTE_SERVER_ERROR = "RemoteServerError";
 
     // ServeConnector struct indices
     public static final BString HTTP_CONNECTOR_CONFIG_FIELD = StringUtils.fromString("config");
@@ -295,6 +295,10 @@ public final class HttpConstants {
     //StatusCodeResponse struct field names
     public static final String STATUS_CODE_RESPONSE_BODY_FIELD = "body";
     public static final String STATUS_CODE_RESPONSE_STATUS_FIELD = "status";
+    public static final String STATUS_CODE_RESPONSE_STATUS_CODE_FIELD = "code";
+    public static final String STATUS_CODE = "statusCode";
+    public static final String STATUS_CODE_RESPONSE_MEDIA_TYPE_FIELD = "mediaType";
+    public static final String STATUS_CODE_RESPONSE_HEADERS_FIELD = "headers";
 
     //PushPromise struct field names
     public static final BString PUSH_PROMISE_PATH_FIELD = StringUtils.fromString("path");
@@ -322,13 +326,32 @@ public final class HttpConstants {
     public static final String HTTP_TRACE_LOG_ENABLED = "http.tracelog.enabled";
     public static final String HTTP_ACCESS_LOG = "http.accesslog";
     public static final String HTTP_ACCESS_LOG_ENABLED = "http.accesslog.enabled";
+    public static final String HTTP_LOG_FORMAT_JSON = "json";
+    public static final String HTTP_LOG_FORMAT_FLAT = "flat";
 
     // TraceLog and AccessLog configs
     public static final BString HTTP_LOG_CONSOLE = StringUtils.fromString("console");
+    public static final BString HTTP_LOG_FORMAT = StringUtils.fromString("format");
+    public static final BString HTTP_LOG_ATTRIBUTES = StringUtils.fromString("attributes");
     public static final BString HTTP_LOG_FILE_PATH = StringUtils.fromString("path");
     public static final BString HTTP_TRACE_LOG_HOST = StringUtils.fromString("host");
     public static final BString HTTP_TRACE_LOG_PORT = StringUtils.fromString("port");
     public static final BString HTTP_LOGGING_PROTOCOL = StringUtils.fromString("HTTP");
+
+    // AccessLog fiend names
+    public static final String ATTRIBUTE_IP = "ip";
+    public static final String ATTRIBUTE_DATE_TIME = "date_time";
+    public static final String ATTRIBUTE_REQUEST_METHOD = "request_method";
+    public static final String ATTRIBUTE_REQUEST_URI = "request_uri";
+    public static final String ATTRIBUTE_SCHEME = "scheme";
+    public static final String ATTRIBUTE_REQUEST = "request";
+    public static final String ATTRIBUTE_STATUS = "status";
+    public static final String ATTRIBUTE_REQUEST_BODY_SIZE = "request_body_size";
+    public static final String ATTRIBUTE_RESPONSE_BODY_SIZE = "response_body_size";
+    public static final String ATTRIBUTE_REQUEST_TIME = "request_time";
+    public static final String ATTRIBUTE_HTTP_REFERRER = "http_referrer";
+    public static final String ATTRIBUTE_HTTP_USER_AGENT = "http_user_agent";
+    public static final String ATTRIBUTE_HTTP_X_FORWARDED_FOR = "http_x_forwarded_for";
 
     // ResponseCacheControl struct field names
     public static final BString RES_CACHE_CONTROL_MUST_REVALIDATE_FIELD = StringUtils.fromString("mustRevalidate");
@@ -382,6 +405,7 @@ public final class HttpConstants {
     public static final String REQUEST_INTERCEPTOR_INDEX = "REQUEST_INTERCEPTOR_INDEX";
     public static final String RESPONSE_INTERCEPTOR_INDEX = "RESPONSE_INTERCEPTOR_INDEX";
     public static final String INTERCEPTOR_SERVICE_ERROR = "INTERCEPTOR_SERVICE_ERROR";
+    public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
     public static final String WAIT_FOR_FULL_REQUEST = "WAIT_FOR_FULL_REQUEST";
     public static final String HTTP_NORMAL = "Normal";
     public static final String REQUEST_INTERCEPTOR = "RequestInterceptor";
@@ -418,6 +442,10 @@ public final class HttpConstants {
     public static final BString ENDPOINT_CONFIG_GRACEFUL_STOP_TIMEOUT = StringUtils.fromString("gracefulStopTimeout");
     public static final BString ENDPOINT_CONFIG_HTTP2_INITIAL_WINDOW_SIZE = StringUtils
             .fromString("http2InitialWindowSize");
+    public static final BString ENDPOINT_CONFIG_IDLE_TIME_STALE_STATE = StringUtils.fromString(
+            "minIdleTimeInStaleState");
+    public static final BString ENDPOINT_CONFIG_TIME_BETWEEN_STALE_CHECK_RUNS = StringUtils.fromString(
+            "timeBetweenStaleEviction");
 
     public static final BString MAX_URI_LENGTH = StringUtils.fromString("maxUriLength");
     public static final BString MAX_STATUS_LINE_LENGTH = StringUtils.fromString("maxStatusLineLength");
@@ -506,6 +534,14 @@ public final class HttpConstants {
     public static final BString CONNECTION_POOLING_WAIT_TIME = StringUtils.fromString("waitTime");
     public static final BString CONNECTION_POOLING_MAX_ACTIVE_STREAMS_PER_CONNECTION = StringUtils.fromString(
             "maxActiveStreamsPerConnection");
+    public static final BString CONNECTION_POOLING_EVICTABLE_IDLE_TIME = StringUtils.fromString(
+            "minEvictableIdleTime");
+    public static final BString CONNECTION_POOLING_TIME_BETWEEN_EVICTION_RUNS = StringUtils.fromString(
+            "timeBetweenEvictionRuns");
+    public static final BString CONNECTION_POOLING_IDLE_TIME_STALE_STATE = StringUtils.fromString(
+            "minIdleTimeInStaleState");
+    public static final BString CONNECTION_POOLING_TIME_BETWEEN_STALE_CHECK_RUNS = StringUtils.fromString(
+            "timeBetweenStaleEviction");
     public static final String HTTP_CLIENT_CONNECTION_POOL = "PoolConfiguration";
     public static final String CONNECTION_MANAGER = "ConnectionManager";
     public static final int POOL_CONFIG_INDEX = 1;

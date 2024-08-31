@@ -101,6 +101,14 @@ public class ValueCreatorUtils {
         return ValueCreator.createRecordValue(ModuleUtils.getHttpPackage(), recordTypeName);
     }
 
+    public static Object createStatusCodeObject(String statusCodeObjName) {
+        return createObjectValue(ModuleUtils.getHttpPackage(), statusCodeObjName);
+    }
+
+    public static Object createDefaultStatusCodeObject(long statusCode) {
+        return createObjectValue(ModuleUtils.getHttpPackage(), "DefaultStatus", statusCode);
+    }
+
     /**
      * Method that creates a runtime object value using the given package id and object type name.
      *

@@ -85,6 +85,7 @@ import io.ballerina.stdlib.mime.util.EntityBodyHandler;
 import io.ballerina.stdlib.mime.util.EntityHeaderHandler;
 import io.ballerina.stdlib.mime.util.EntityWrapper;
 import io.ballerina.stdlib.mime.util.HeaderUtil;
+import io.ballerina.stdlib.mime.util.MimeConstants;
 import io.ballerina.stdlib.mime.util.MimeUtil;
 import io.ballerina.stdlib.mime.util.MultipartDataSource;
 import io.ballerina.stdlib.mime.util.MultipartDecoder;
@@ -205,6 +206,9 @@ public class HttpUtil {
     private static final String IO_EXCEPTION_OCCURRED = "I/O exception occurred";
     private static final String CHUNKING_CONFIG = "chunking_config";
     private static final String ILLEGAL_FUNCTION_INVOKED = "illegal respond: response has already been sent";
+    private static final String JAVA_CONFIG_TLS_NAMED_GROUPS = "jdk.tls.namedGroups";
+    private static final String[] DEFAULT_NAMED_GROUPS = { "X25519Kyber768Draft00", "x25519", "secp256r1",
+            "secp384r1", "secp521r1" };
 
     /**
      * Set new entity to in/out request/response struct.
@@ -398,7 +402,11 @@ public class HttpUtil {
         Service httpService = (Service) connectionObj.getNativeData(HttpConstants.HTTP_SERVICE);
         if (httpService != null) {
             HttpUtil.setCompressionHeaders(httpService.getCompressionConfig(), inboundRequestMsg, outboundResponseMsg);
-            HttpUtil.setChunkingHeader(httpService.getChunkingConfig(), outboundResponseMsg);
+            if (HttpUtil.hasEventStreamContentType(outboundResponseMsg)) {
+                HttpUtil.setChunkingHeader(HttpConstants.ALWAYS, outboundResponseMsg);
+            } else {
+                HttpUtil.setChunkingHeader(httpService.getChunkingConfig(), outboundResponseMsg);
+            }
             if (httpService.getMediaTypeSubtypePrefix() != null) {
                 HttpUtil.setMediaTypeSubtypePrefix(httpService.getMediaTypeSubtypePrefix(), outboundResponseMsg);
             }
@@ -493,12 +501,10 @@ public class HttpUtil {
         PipeliningHandler.sendPipelinedResponse(requestMessage, createErrorMessage(errorMsg, statusCode));
     }
 
-    public static void handleFailure(HttpCarbonMessage requestMessage, BError error, Boolean printStackTrace) {
+    public static void handleFailure(HttpCarbonMessage requestMessage, BError error) {
         String errorMsg = getErrorMessage(error);
         int statusCode = getStatusCode(requestMessage, errorMsg);
-        if (printStackTrace) {
-            error.printStackTrace();
-        }
+        error.printStackTrace();
         PipeliningHandler.sendPipelinedResponse(requestMessage, createErrorMessage(errorMsg, statusCode));
     }
 
@@ -1352,6 +1358,28 @@ public class HttpUtil {
                 maxActiveStreamsPerConnection == -1 ? Integer.MAX_VALUE : validateConfig(
                         maxActiveStreamsPerConnection,
                         HttpConstants.CONNECTION_POOLING_MAX_ACTIVE_STREAMS_PER_CONNECTION.getValue()));
+
+        double minEvictableIdleTime =
+                ((BDecimal) poolRecord.get(HttpConstants.CONNECTION_POOLING_EVICTABLE_IDLE_TIME)).floatValue();
+        poolConfiguration.setMinEvictableIdleTime(minEvictableIdleTime < 0 ? 0 : (long) minEvictableIdleTime * 1000);
+
+        double timeBetweenEvictionRuns =
+                ((BDecimal) poolRecord.get(HttpConstants.CONNECTION_POOLING_TIME_BETWEEN_EVICTION_RUNS)).floatValue();
+        if (timeBetweenEvictionRuns > 0) {
+            poolConfiguration.setTimeBetweenEvictionRuns((long) timeBetweenEvictionRuns * 1000);
+        }
+
+        double minIdleTimeInStaleState =
+                ((BDecimal) poolRecord.get(HttpConstants.CONNECTION_POOLING_IDLE_TIME_STALE_STATE)).floatValue();
+        poolConfiguration.setMinIdleTimeInStaleState(minIdleTimeInStaleState < -1 ? -1 :
+                (long) minIdleTimeInStaleState * 1000);
+
+        double timeBetweenStaleEviction =
+                ((BDecimal) poolRecord.get(HttpConstants.CONNECTION_POOLING_TIME_BETWEEN_STALE_CHECK_RUNS))
+                        .floatValue();
+        if (timeBetweenStaleEviction > 0) {
+            poolConfiguration.setTimeBetweenStaleEviction((long) timeBetweenStaleEviction * 1000);
+        }
     }
 
     private static int validateConfig(long value, String configName) {
@@ -1563,6 +1591,19 @@ public class HttpUtil {
         listenerConfiguration.setPipeliningEnabled(true); //Pipelining is enabled all the time
         listenerConfiguration.setHttp2InitialWindowSize(endpointConfig
                 .getIntValue(ENDPOINT_CONFIG_HTTP2_INITIAL_WINDOW_SIZE).intValue());
+
+        double minIdleTimeInStaleState =
+                ((BDecimal) endpointConfig.get(HttpConstants.ENDPOINT_CONFIG_IDLE_TIME_STALE_STATE)).floatValue();
+        listenerConfiguration.setMinIdleTimeInStaleState(minIdleTimeInStaleState < -1 ? -1 :
+                (long) minIdleTimeInStaleState * 1000);
+
+        double timeBetweenStaleEviction =
+                ((BDecimal) endpointConfig.get(HttpConstants.ENDPOINT_CONFIG_TIME_BETWEEN_STALE_CHECK_RUNS))
+                        .floatValue();
+        if (timeBetweenStaleEviction > 0) {
+            listenerConfiguration.setTimeBetweenStaleEviction((long) timeBetweenStaleEviction * 1000);
+        }
+
         return listenerConfiguration;
     }
 
@@ -1825,6 +1866,9 @@ public class HttpUtil {
         if (!sslProtocol.isBlank()) {
             sslConfiguration.setSSLProtocol(sslProtocol);
         }
+        if (System.getProperty(JAVA_CONFIG_TLS_NAMED_GROUPS) == null) {
+            System.setProperty(JAVA_CONFIG_TLS_NAMED_GROUPS, String.join(",", DEFAULT_NAMED_GROUPS));
+        }
     }
 
     private static void evaluateCertValidationField(BMap<BString, Object> certValidation,
@@ -1976,6 +2020,11 @@ public class HttpUtil {
                    Objects.nonNull(bodyField);
         }
         return false;
+    }
+
+    public static boolean hasEventStreamContentType(HttpCarbonMessage message) {
+        String contentType = HttpUtil.getContentTypeFromTransportMessage(message);
+        return contentType != null && contentType.startsWith(MimeConstants.TEXT_EVENT_STREAM);
     }
 
     private HttpUtil() {

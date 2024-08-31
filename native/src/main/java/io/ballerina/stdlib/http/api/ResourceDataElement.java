@@ -31,9 +31,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static io.ballerina.stdlib.http.api.HttpErrorType.GENERIC_LISTENER_ERROR;
-import static io.ballerina.stdlib.http.api.HttpErrorType.REQUEST_NOT_ACCEPTABLE_ERROR;
-import static io.ballerina.stdlib.http.api.HttpErrorType.RESOURCE_METHOD_NOT_ALLOWED_ERROR;
-import static io.ballerina.stdlib.http.api.HttpErrorType.UNSUPPORTED_REQUEST_MEDIA_TYPE_ERROR;
+import static io.ballerina.stdlib.http.api.HttpErrorType.INTERNAL_REQUEST_NOT_ACCEPTABLE_ERROR;
+import static io.ballerina.stdlib.http.api.HttpErrorType.INTERNAL_RESOURCE_METHOD_NOT_ALLOWED_ERROR;
+import static io.ballerina.stdlib.http.api.HttpErrorType.INTERNAL_UNSUPPORTED_REQUEST_MEDIA_TYPE_ERROR;
 
 /**
  * Http Node Item for URI template tree.
@@ -75,9 +75,14 @@ public class ResourceDataElement implements DataElement<Resource, HttpCarbonMess
         this.resource.forEach(r -> {
             for (String newMethod : newMethods) {
                 if (DispatcherUtil.isMatchingMethodExist(r, newMethod)) {
-                    if (r.getName().equals(HttpIntrospectionResource.getIntrospectionResourceId())) {
+                    if (r.getName().equals(HttpIntrospectionResource.getResourceId())) {
                         String message = "Resources cannot have the accessor and name as same as the auto generated " +
                                 "Open API spec retrieval resource: '" + r.getName() + "'";
+                        throw HttpUtil.createHttpError(message, GENERIC_LISTENER_ERROR);
+                    }
+                    if (r.getName().equals(HttpSwaggerUiResource.getResourceId())) {
+                        String message = "Resources cannot have the accessor and name as same as the auto generated " +
+                                "Swagger-UI retrieval resource: '" + r.getName() + "'";
                         throw HttpUtil.createHttpError(message, GENERIC_LISTENER_ERROR);
                     }
                     throw HttpUtil.createHttpError("Two resources have the same addressable URI, "
@@ -136,8 +141,7 @@ public class ResourceDataElement implements DataElement<Resource, HttpCarbonMess
             return httpResource;
         }
         if (!isOptionsRequest) {
-            String message = "Method not allowed";
-            throw HttpUtil.createHttpStatusCodeError(RESOURCE_METHOD_NOT_ALLOWED_ERROR, message);
+            throw HttpUtil.createHttpStatusCodeError(INTERNAL_RESOURCE_METHOD_NOT_ALLOWED_ERROR, "Method not allowed");
         }
         return null;
     }
@@ -178,7 +182,7 @@ public class ResourceDataElement implements DataElement<Resource, HttpCarbonMess
         String contentMediaType = extractContentMediaType(cMsg.getHeader(HttpHeaderNames.CONTENT_TYPE.toString()));
         List<String> consumesList = resource.getConsumes();
 
-        if (consumesList == null) {
+        if (consumesList == null || consumesList.isEmpty()) {
             return;
         }
         //when Content-Type header is not set, treat it as "application/octet-stream"
@@ -189,7 +193,7 @@ public class ResourceDataElement implements DataElement<Resource, HttpCarbonMess
             }
         }
         String message = "content-type : " + contentMediaType + " is not supported";
-        throw HttpUtil.createHttpStatusCodeError(UNSUPPORTED_REQUEST_MEDIA_TYPE_ERROR, message);
+        throw HttpUtil.createHttpStatusCodeError(INTERNAL_UNSUPPORTED_REQUEST_MEDIA_TYPE_ERROR, message);
     }
 
     private String extractContentMediaType(String header) {
@@ -206,7 +210,7 @@ public class ResourceDataElement implements DataElement<Resource, HttpCarbonMess
         List<String> acceptMediaTypes = extractAcceptMediaTypes(cMsg.getHeader(HttpHeaderNames.ACCEPT.toString()));
         List<String> producesList = resource.getProduces();
 
-        if (producesList == null || acceptMediaTypes == null) {
+        if (producesList == null || producesList.isEmpty() || acceptMediaTypes == null) {
             return;
         }
         //If Accept header field is not present, then it is assumed that the client accepts all media types.
@@ -231,7 +235,7 @@ public class ResourceDataElement implements DataElement<Resource, HttpCarbonMess
                 return;
             }
         }
-        throw HttpUtil.createHttpStatusCodeError(REQUEST_NOT_ACCEPTABLE_ERROR, "Request is not acceptable");
+        throw HttpUtil.createHttpStatusCodeError(INTERNAL_REQUEST_NOT_ACCEPTABLE_ERROR, "Request is not acceptable");
     }
 
     private List<String> extractAcceptMediaTypes(String header) {
