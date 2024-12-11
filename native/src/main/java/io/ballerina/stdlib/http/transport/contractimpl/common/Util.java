@@ -145,6 +145,7 @@ public class Util {
 
     private static final Logger LOG = LoggerFactory.getLogger(Util.class);
     public static final String HTTP_1_1 = "http/1.1";
+    private static final float EPSILON = 0.00001f;
 
     private static String getStringValue(HttpCarbonMessage msg, String key, String defaultValue) {
         String value = (String) msg.getProperty(key);
@@ -198,7 +199,7 @@ public class Util {
             outboundResponseMsg.setHeader(HttpHeaderNames.CONNECTION.toString(), Constants.CONNECTION_CLOSE);
         } else if (keepAlive && (Float.valueOf(inboundReqHttpVersion) < Constants.HTTP_1_1)) {
             outboundResponseMsg.setHeader(HttpHeaderNames.CONNECTION.toString(), Constants.CONNECTION_KEEP_ALIVE);
-        } else if (Float.valueOf(inboundReqHttpVersion) == Constants.HTTP_1_1
+        } else if (Math.abs(Float.valueOf(inboundReqHttpVersion) - Constants.HTTP_1_1) < EPSILON
                 && HttpUtil.hasEventStreamContentType(outboundResponseMsg)) {
             outboundResponseMsg.setHeader(HttpHeaderNames.CONNECTION.toString(), Constants.CONNECTION_KEEP_ALIVE);
         } else {
@@ -418,7 +419,7 @@ public class Util {
         SslHandler sslHandler = sslContext.newHandler(socketChannel.alloc(), host, port);
         SSLEngine sslEngine = sslHandler.engine();
         sslHandlerFactory.addCommonConfigs(sslEngine);
-        sslHandlerFactory.setSNIServerNames(sslEngine, host);
+        configureSniServerName(sslConfig, host, sslHandlerFactory, sslEngine);
         if (sslConfig.isHostNameVerificationEnabled()) {
             setHostNameVerfication(sslEngine);
         }
@@ -513,12 +514,18 @@ public class Util {
         if (sslConfig != null) {
             sslEngine = sslHandlerFactory.buildClientSSLEngine(host, port);
             sslEngine.setUseClientMode(true);
-            sslHandlerFactory.setSNIServerNames(sslEngine, host);
+            configureSniServerName(sslConfig, host, sslHandlerFactory, sslEngine);
             if (hostNameVerificationEnabled) {
                 sslHandlerFactory.setHostNameVerfication(sslEngine);
             }
         }
         return sslEngine;
+    }
+
+    private static void configureSniServerName(SSLConfig sslConfig, String host, SSLHandlerFactory sslHandlerFactory,
+                                               SSLEngine sslEngine) {
+        sslHandlerFactory.setSNIServerNames(sslEngine,
+                sslConfig.getSniHostName() != null ? sslConfig.getSniHostName() : host);
     }
 
     /**

@@ -17,18 +17,18 @@
 */
 package io.ballerina.stdlib.http.api;
 
-import io.ballerina.runtime.api.PredefinedTypes;
-import io.ballerina.runtime.api.TypeTags;
 import io.ballerina.runtime.api.creators.TypeCreator;
 import io.ballerina.runtime.api.creators.ValueCreator;
 import io.ballerina.runtime.api.types.ArrayType;
 import io.ballerina.runtime.api.types.FiniteType;
 import io.ballerina.runtime.api.types.MapType;
 import io.ballerina.runtime.api.types.MethodType;
+import io.ballerina.runtime.api.types.PredefinedTypes;
 import io.ballerina.runtime.api.types.RecordType;
 import io.ballerina.runtime.api.types.RemoteMethodType;
 import io.ballerina.runtime.api.types.ResourceMethodType;
 import io.ballerina.runtime.api.types.Type;
+import io.ballerina.runtime.api.types.TypeTags;
 import io.ballerina.runtime.api.types.UnionType;
 import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.utils.TypeUtils;
@@ -97,7 +97,6 @@ public class HttpResource implements Resource {
     private MethodType balResource;
     private List<String> methods;
     private String path;
-    private String entityBodyAttribute;
     private List<String> consumes;
     private List<String> produces;
     private List<String> producesSubTypes;
@@ -111,6 +110,7 @@ public class HttpResource implements Resource {
     private BMap cacheConfig;
     private boolean treatNilableAsOptional;
     private boolean constraintValidation;
+    private boolean laxDataBinding;
 
     protected HttpResource(MethodType resource, HttpService parentService) {
         this.balResource = resource;
@@ -310,6 +310,7 @@ public class HttpResource implements Resource {
         }
         processResourceCors(httpResource, httpService);
         httpResource.setConstraintValidation(httpService.getConstraintValidation());
+        httpResource.setLaxDataBinding(httpService.getLaxDataBinding());
         httpResource.prepareAndValidateSignatureParams();
         if (Objects.nonNull(httpResource.getResourceLinkName()) && httpResource.linkReturnMediaTypes.isEmpty()) {
             Type resourceReturnType = httpResource.getBalResource().getType().getReturnType();
@@ -329,6 +330,14 @@ public class HttpResource implements Resource {
 
     private boolean getConstraintValidation() {
         return this.constraintValidation;
+    }
+
+    private void setLaxDataBinding(boolean laxDataBinding) {
+        this.laxDataBinding = laxDataBinding;
+    }
+
+    private boolean getLaxDataBinding() {
+        return this.laxDataBinding;
     }
 
     private void updateLinkedResources(Object[] links) {
@@ -387,7 +396,8 @@ public class HttpResource implements Resource {
     }
 
     private void prepareAndValidateSignatureParams() {
-        paramHandler = new ParamHandler(getBalResource(), this.pathParamCount, this.getConstraintValidation());
+        paramHandler = new ParamHandler(getBalResource(), this.pathParamCount, this.getConstraintValidation(),
+                this.getLaxDataBinding());
     }
 
     @Override

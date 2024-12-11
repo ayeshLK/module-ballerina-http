@@ -486,6 +486,7 @@ public final class HttpConstants {
     public static final BString SECURESOCKET_CONFIG_VERIFY_CLIENT = StringUtils.fromString("verifyClient");
     public static final BString SECURESOCKET_CONFIG_CERT_VALIDATION_TYPE_OCSP_STAPLING =
             StringUtils.fromString("OCSP_STAPLING");
+    public static final BString SECURESOCKET_CONFIG_SNI_HOST_NAME = StringUtils.fromString("serverName");
 
     //Socket Config
     public static final BString SOCKET_CONFIG = StringUtils.fromString("socketConfig");
@@ -496,6 +497,14 @@ public final class HttpConstants {
     public static final BString SOCKET_CONFIG_TCP_NO_DELAY = StringUtils.fromString("tcpNoDelay");
     public static final BString SOCKET_CONFIG_SOCKET_REUSE = StringUtils.fromString("socketReuse");
     public static final BString SOCKET_CONFIG_KEEP_ALIVE = StringUtils.fromString("keepAlive");
+
+    //Service parseAsType constants
+    public static final String ENABLE_CONSTRAINT_VALIDATION = "enableConstraintValidation";
+    public static final String ALLOW_DATA_PROJECTION = "allowDataProjection";
+    public static final String PARSER_AS_TYPE_OPTIONS =  "Options";
+
+    public static final String NIL_AS_OPTIONAL = "nilAsOptional";
+    public static final String ABSENT_AS_NILABLE = "absentAsNilable";
 
     //Client Endpoint (CallerActions)
     public static final String CLIENT_ENDPOINT_SERVICE_URI = "url";

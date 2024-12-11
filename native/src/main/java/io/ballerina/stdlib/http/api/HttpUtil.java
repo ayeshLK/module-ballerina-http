@@ -20,10 +20,7 @@ package io.ballerina.stdlib.http.api;
 
 import io.ballerina.runtime.api.Environment;
 import io.ballerina.runtime.api.Module;
-import io.ballerina.runtime.api.PredefinedTypes;
 import io.ballerina.runtime.api.Runtime;
-import io.ballerina.runtime.api.TypeTags;
-import io.ballerina.runtime.api.async.Callback;
 import io.ballerina.runtime.api.creators.ErrorCreator;
 import io.ballerina.runtime.api.creators.ValueCreator;
 import io.ballerina.runtime.api.types.Field;
@@ -33,6 +30,7 @@ import io.ballerina.runtime.api.types.ObjectType;
 import io.ballerina.runtime.api.types.RecordType;
 import io.ballerina.runtime.api.types.Type;
 import io.ballerina.runtime.api.types.TypeId;
+import io.ballerina.runtime.api.types.TypeTags;
 import io.ballerina.runtime.api.utils.JsonUtils;
 import io.ballerina.runtime.api.utils.StringUtils;
 import io.ballerina.runtime.api.utils.TypeUtils;
@@ -118,7 +116,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
 
 import static io.ballerina.runtime.api.constants.RuntimeConstants.BALLERINA_VERSION;
@@ -1412,13 +1409,7 @@ public class HttpUtil {
         }
         Object cert = secureSocket.get(HttpConstants.SECURESOCKET_CONFIG_CERT);
         if (cert == null) {
-            BMap<BString, Object> key = getBMapValueIfPresent(secureSocket, HttpConstants.SECURESOCKET_CONFIG_KEY);
-            if (key != null) {
-                senderConfiguration.useJavaDefaults();
-            } else {
-                throw createHttpError("Need to configure cert with client SSL certificates file",
-                        HttpErrorType.SSL_ERROR);
-            }
+            senderConfiguration.useJavaDefaults();
         } else {
             evaluateCertField(cert, senderConfiguration);
         }
@@ -1645,30 +1636,17 @@ public class HttpUtil {
     }
 
     public static void populateInterceptorServicesFromListener(BObject serviceEndpoint, Runtime runtime) {
-        final CountDownLatch latch = new CountDownLatch(1);
         final BArray[] interceptorResponse = new BArray[1];
-        Callback interceptorCallback = new Callback() {
-            @Override
-            public void notifySuccess(Object result) {
-                if (result instanceof BArray) {
-                    interceptorResponse[0] = (BArray) result;
-                } else {
-                    ((BError) result).printStackTrace();
-                }
-                latch.countDown();
-            }
-            @Override
-            public void notifyFailure(BError bError) {
-                bError.printStackTrace();
-                System.exit(1);
-            }
-        };
-        runtime.invokeMethodAsyncSequentially(serviceEndpoint, CREATE_INTERCEPTORS_FUNCTION_NAME, null, null,
-                interceptorCallback, null, PredefinedTypes.TYPE_ANY, null, true);
         try {
-            latch.await();
-        } catch (InterruptedException exception) {
-            log.warn("Interrupted before receiving the interceptor response");
+            Object result =  runtime.callMethod(serviceEndpoint, CREATE_INTERCEPTORS_FUNCTION_NAME, null);
+            if (result instanceof BArray) {
+                interceptorResponse[0] = (BArray) result;
+            } else {
+                ((BError) result).printStackTrace();
+            }
+        } catch (BError bError) {
+            bError.printStackTrace();
+            System.exit(1);
         }
         if (interceptorResponse[0] == null) {
             return;
@@ -1916,6 +1894,11 @@ public class HttpUtil {
         Parameter enableSessionCreationParam = new Parameter(HttpConstants.SECURESOCKET_CONFIG_SHARE_SESSION.getValue(),
                                                              enableSessionCreation);
         paramList.add(enableSessionCreationParam);
+        if (secureSocket.containsKey(HttpConstants.SECURESOCKET_CONFIG_SNI_HOST_NAME)) {
+            Parameter sniHostNameParam = new Parameter(HttpConstants.SECURESOCKET_CONFIG_SNI_HOST_NAME.getValue(),
+                    String.valueOf(secureSocket.getStringValue(HttpConstants.SECURESOCKET_CONFIG_SNI_HOST_NAME)));
+            paramList.add(sniHostNameParam);
+        }
     }
 
     private static BMap<BString, Object> getBMapValueIfPresent(BMap<BString, Object> map, BString key) {
@@ -1933,15 +1916,19 @@ public class HttpUtil {
     }
 
     /**
-     * This method will remove the escape character "\" from a string and encode it. This is used for both basePath and
-     * resource path sanitization. When the special chars are present in those paths, user can escape them in order to
-     * get through the compilation phrase. Then listener sanitize and register paths in both basePath map and resource
-     * syntax tree using encoded values as during the dispatching, the path matches with raw path.
+     * This method will remove the escape character "\" and identifier quote character "'" from a string and encode it.
+     * This is used for both basePath and resource path sanitization. When the special chars are present in those
+     * paths, user can escape them in order to get through the compilation phrase. Then listener sanitize and register
+     * paths in both basePath map and resource syntax tree using encoded values as during the dispatching, the path
+     * matches with raw path.
      *
      * @param segment path segment
      * @return encoded value
      */
     public static String unescapeAndEncodeValue(String segment) {
+        if (segment.length() > 1 && segment.startsWith("'")) {
+            segment = segment.substring(1);
+        }
         if (!segment.contains("\\")) {
             return segment;
         }

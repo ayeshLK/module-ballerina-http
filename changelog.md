@@ -14,10 +14,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - [Improve `@http:Query` annotation to overwrite the query parameter name in service](https://github.com/ballerina-platform/ballerina-library/issues/7006)
 - [Add header name mapping support in record fields](https://github.com/ballerina-platform/ballerina-library/issues/7018)
 - [Introduce util functions to convert query and header record with the `http:Query` and the `http:Header` annotations](https://github.com/ballerina-platform/ballerina-library/issues/7019)
+- [Migrate client and service data binding lang utils usage into data.jsondata module utils `toJson` and `parserAsType`](https://github.com/ballerina-platform/ballerina-library/issues/6747)
+- [Add static code rules](https://github.com/ballerina-platform/ballerina-library/issues/7283)
+- [Add relax data binding support for service and client data binding](https://github.com/ballerina-platform/ballerina-library/issues/7366)
+- [Add support for configuring server name to be used in the SSL SNI extension](https://github.com/ballerina-platform/ballerina-library/issues/7435)
 
 ### Fixed
 
 - [Address CVE-2024-7254 vulnerability](https://github.com/ballerina-platform/ballerina-library/issues/7013)
+- [Fix duplicating `Content-Type` header via the `addHeader` method](https://github.com/ballerina-platform/ballerina-library/issues/7268)
+- [Update netty version](https://github.com/ballerina-platform/ballerina-library/issues/7358)
+- [Fix the issue of not being able to configure only server name in the secureSocket config](https://github.com/ballerina-platform/ballerina-library/issues/7443)
+- [Fix rest path parameter generation with decoded path segments](https://github.com/ballerina-platform/ballerina-library/issues/7430)
 
 ## [2.12.0] - 2024-08-20
 
