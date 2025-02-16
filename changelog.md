@@ -5,7 +5,19 @@ This file contains all the notable changes done to the Ballerina HTTP package th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to 
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.13.2]
+
+### Changed
+
+- [Downgrade netty tcnative version](https://github.com/ballerina-platform/ballerina-library/issues/7584)
+
+## [2.13.1] - 2025-02-11
+
+### Fixed
+
+- [Address Netty security vulnerabilities: `CVE-2025-24970` and `CVE-2025-25193`](https://github.com/ballerina-platform/ballerina-library/issues/7571)
+
+## [2.13.0] - 2025-02-07
 
 ### Added
 
@@ -35,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - [Add connection eviction feature to handle connections that receive GO_AWAY from the client](https://github.com/ballerina-platform/ballerina-library/issues/6734)
 - [Enhance the configurability of Ballerina access logging by introducing multiple configuration options.](https://github.com/ballerina-platform/ballerina-library/issues/6111)
 - [Introduce HTTP service contract object type](https://github.com/ballerina-platform/ballerina-library/issues/6378)
+- [Add default HTTP listener](https://github.com/ballerina-platform/ballerina-library/issues/7514)
 
 ### Fixed
 
